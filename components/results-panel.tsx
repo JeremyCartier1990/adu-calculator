@@ -1,12 +1,8 @@
 import { CashFlowChart } from "@/components/cash-flow-chart";
-import type { Estimate } from "@/lib/calculate";
+import { StrPanel } from "@/components/str-panel";
+import { ASSUMPTIONS } from "@/lib/assumptions";
+import type { Estimate, RentalUse } from "@/lib/calculate";
 import { formatMoney, formatNumber, formatYears } from "@/lib/money";
-
-const RENT_SOURCE = {
-  rentcast: "RentCast rent estimate",
-  assumption: "Los Angeles planning rate",
-  manual: "Rent you entered",
-} as const;
 
 function Row({
   label,
@@ -45,12 +41,45 @@ function Meter({ label, value, max, tone }: { label: string; value: number; max:
   );
 }
 
-export function ResultsPanel({ estimate }: { estimate: Estimate }) {
+const ORDINANCE_NOTE =
+  "Short-term rentals of ADUs may be restricted by local rules. Los Angeles's home-sharing ordinance limits registration, primary-residence use, and how many nights a host can rent. Confirm the rules for this address before counting on nightly income.";
+
+export function ResultsPanel({
+  estimate,
+  onRentalUse,
+  occupancyPercent,
+  onOccupancyPercent,
+  nightlyRateInput,
+  onNightlyRateInput,
+  nightlyIsCustom,
+  onResetNightly,
+  usingAirroi,
+  latitude,
+  longitude,
+  onMarketNumbers,
+  onVerifiedPhone,
+}: {
+  estimate: Estimate;
+  onRentalUse: (use: RentalUse) => void;
+  occupancyPercent: number;
+  onOccupancyPercent: (value: number) => void;
+  nightlyRateInput: string;
+  onNightlyRateInput: (value: string) => void;
+  nightlyIsCustom: boolean;
+  onResetNightly: () => void;
+  usingAirroi: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  onMarketNumbers: (numbers: { adr: number; occupancy: number } | null) => void;
+  onVerifiedPhone: (phone: string | null) => void;
+}) {
   const meterMax = Math.max(estimate.blendedUplift, estimate.total, 1);
+  const active = estimate.rentalUse === "short_term" ? estimate.scenarios.shortTerm : estimate.scenarios.longTerm;
   const rentRange =
     estimate.rentLow != null && estimate.rentHigh != null
       ? `${formatMoney(estimate.rentLow)}–${formatMoney(estimate.rentHigh)}`
       : null;
+  const scenarioName = estimate.rentalUse === "short_term" ? "Short-term rental" : "Long-term lease";
 
   return (
     <div className="space-y-5">
@@ -74,10 +103,12 @@ export function ResultsPanel({ estimate }: { estimate: Estimate }) {
           <div className="rounded-2xl bg-paper px-3 py-3">
             <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Net / month</dt>
             <dd className="mt-1 text-xl font-semibold tabular-nums">{formatMoney(estimate.monthlyNet)}</dd>
+            <p className="mt-1 text-xs text-ink-soft">{scenarioName}</p>
           </div>
           <div className="rounded-2xl bg-paper px-3 py-3">
             <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Payback</dt>
             <dd className="mt-1 text-xl font-semibold tabular-nums">{formatYears(estimate.breakEvenYears)}</dd>
+            <p className="mt-1 text-xs text-ink-soft">{scenarioName}</p>
           </div>
         </dl>
 
@@ -115,29 +146,107 @@ export function ResultsPanel({ estimate }: { estimate: Estimate }) {
 
       <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="income-heading">
         <h3 id="income-heading" className="font-serif text-2xl tracking-tight">Rent & payback</h3>
-        <p className="mt-1 text-sm text-ink-soft">{RENT_SOURCE[estimate.rentSource]}</p>
+        <p className="mt-1 text-sm leading-6 text-ink-soft">
+          Both figures stay on screen. Payback, the chart, and the income approach follow the one you select.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Rental scenario">
+          <ScenarioCard
+            scenario={estimate.scenarios.longTerm}
+            selected={estimate.rentalUse === "long_term"}
+            onSelect={() => onRentalUse("long_term")}
+            extra={rentRange ? `RentCast range ${rentRange}` : undefined}
+          />
+          <ScenarioCard
+            scenario={{
+              ...estimate.scenarios.shortTerm,
+              sourceNote: usingAirroi
+                ? "AirROI market rate and occupancy. The costs below are still planning allowances."
+                : estimate.scenarios.shortTerm.sourceNote,
+            }}
+            selected={estimate.rentalUse === "short_term"}
+            onSelect={() => onRentalUse("short_term")}
+          />
+        </div>
+        <StrPanel
+          latitude={latitude}
+          longitude={longitude}
+          bedrooms={estimate.bedrooms}
+          onMarketNumbers={onMarketNumbers}
+          onVerifiedPhone={onVerifiedPhone}
+        />
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="nightly-rate" className="text-sm font-medium">
+              Nightly rate
+            </label>
+            <div className="mt-1 flex min-h-12 items-center rounded-xl border border-line bg-white focus-within:border-pine focus-within:ring-2 focus-within:ring-pine">
+              <span className="pl-3 text-ink-soft">$</span>
+              <input
+                id="nightly-rate"
+                inputMode="decimal"
+                value={nightlyRateInput}
+                onChange={(event) => onNightlyRateInput(event.target.value)}
+                className="min-h-12 w-full bg-transparent px-2 text-base outline-none"
+              />
+            </div>
+            <p className="mt-1 text-xs leading-5 text-ink-soft">
+              Default is {ASSUMPTIONS.shortTerm.nightlyFromMonthlyMultiplier}× the long-term rent, spread over{" "}
+              {ASSUMPTIONS.shortTerm.daysPerMonth} days.
+            </p>
+            {nightlyIsCustom ? (
+              <button
+                type="button"
+                className="mt-1 text-sm font-semibold text-pine underline-offset-2 hover:underline"
+                onClick={onResetNightly}
+              >
+                Use the estimated nightly rate
+              </button>
+            ) : null}
+          </div>
+          <div>
+            <div className="flex items-baseline justify-between gap-3">
+              <label htmlFor="occupancy" className="text-sm font-medium">
+                Occupancy
+              </label>
+              <span className="font-semibold tabular-nums">{occupancyPercent}%</span>
+            </div>
+            <input
+              id="occupancy"
+              type="range"
+              min={Math.round(ASSUMPTIONS.shortTerm.occupancyMin * 100)}
+              max={Math.round(ASSUMPTIONS.shortTerm.occupancyMax * 100)}
+              step={1}
+              value={occupancyPercent}
+              aria-valuemin={Math.round(ASSUMPTIONS.shortTerm.occupancyMin * 100)}
+              aria-valuemax={Math.round(ASSUMPTIONS.shortTerm.occupancyMax * 100)}
+              aria-valuenow={occupancyPercent}
+              aria-valuetext={`${occupancyPercent} percent occupied`}
+              onChange={(event) => onOccupancyPercent(Number(event.target.value))}
+            />
+            <p className="text-xs leading-5 text-ink-soft">
+              Los Angeles planning default is {Math.round(ASSUMPTIONS.shortTerm.defaultOccupancy * 100)}%. Empty nights are already out of the gross.
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-4 text-sm leading-6 text-ink-soft">{ORDINANCE_NOTE}</p>
+
+        <h4 className="mt-6 font-serif text-xl tracking-tight">{active.label}</h4>
+        <p className="mt-1 text-sm text-ink-soft">{active.sourceNote}</p>
         <dl className="mt-2">
-          <Row
-            label="Gross monthly rent"
-            value={formatMoney(estimate.monthlyRent)}
-            hint={rentRange ? `Range ${rentRange}` : undefined}
-          />
-          <Row label="Gross annual rent" value={formatMoney(estimate.yearOne.gross)} />
-          <Row label="Vacancy" value={formatMoney(estimate.yearOne.vacancy)} />
-          <Row label="Maintenance" value={formatMoney(estimate.yearOne.maintenance)} />
-          <Row label="Insurance" value={formatMoney(estimate.yearOne.insurance)} />
-          <Row
-            label="Added property tax"
-            value={formatMoney(estimate.yearOne.propertyTax)}
-            hint="1.2% of project cost"
-          />
-          <Row label="Net income / year" value={formatMoney(estimate.annualNet)} strong />
-          <Row label="Net income / month" value={formatMoney(estimate.monthlyNet)} hint="Year-one net divided by 12" />
-          <Row label="Payback with rent growth" value={formatYears(estimate.breakEvenYears)} />
-          <Row label="Simple payback, no growth" value={formatYears(estimate.simplePaybackYears)} />
+          <Row label={active.summary} value={formatMoney(active.monthlyGross)} />
+          <Row label="Gross annual revenue" value={formatMoney(active.annualGross)} />
+          {active.lines.map((line) => (
+            <Row key={line.label} label={line.label} value={formatMoney(line.amount)} hint={line.hint} />
+          ))}
+          <Row label="Net income / year" value={formatMoney(active.annualNet)} strong />
+          <Row label="Net income / month" value={formatMoney(active.monthlyNet)} hint="Year-one net divided by 12" />
+          <Row label="Payback with rent growth" value={formatYears(active.breakEvenYears)} />
+          <Row label="Simple payback, no growth" value={formatYears(active.simplePaybackYears)} />
         </dl>
         <div className="mt-6">
-          <CashFlowChart series={estimate.series} breakEvenYears={estimate.breakEvenYears} />
+          <CashFlowChart series={active.series} breakEvenYears={active.breakEvenYears} />
         </div>
       </section>
 
@@ -157,7 +266,11 @@ export function ResultsPanel({ estimate }: { estimate: Estimate }) {
           <Row
             label="Income approach"
             value={estimate.incomeUplift == null ? "—" : formatMoney(estimate.incomeUplift)}
-            hint={estimate.incomeUplift == null ? "Hidden when net income is not positive" : "Year-one net ÷ cap rate"}
+            hint={
+              estimate.incomeUplift == null
+                ? `Hidden because ${scenarioName.toLowerCase()} net income is not positive`
+                : `Year-one ${scenarioName.toLowerCase()} net ÷ cap rate`
+            }
           />
           <Row label="Blended value added" value={formatMoney(estimate.blendedUplift)} />
           <Row
@@ -188,5 +301,40 @@ export function ResultsPanel({ estimate }: { estimate: Estimate }) {
         </ul>
       </details>
     </div>
+  );
+}
+
+function ScenarioCard({
+  scenario,
+  selected,
+  onSelect,
+  extra,
+}: {
+  scenario: Estimate["scenarios"]["longTerm"];
+  selected: boolean;
+  onSelect: () => void;
+  extra?: string;
+}) {
+  return (
+    <label
+      className={`block cursor-pointer rounded-2xl border p-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-pine ${selected ? "border-pine bg-pine-soft" : "border-line bg-white"}`}
+    >
+      <input
+        type="radio"
+        name="rentalUse"
+        value={scenario.id}
+        checked={selected}
+        onChange={onSelect}
+        className="sr-only"
+      />
+      <span className="block text-sm font-semibold leading-5">{scenario.label}</span>
+      <span className="mt-2 block text-xs uppercase tracking-wide text-ink-soft">{scenario.summary}</span>
+      <span className="mt-1 block font-serif text-2xl tabular-nums">{formatMoney(scenario.monthlyGross)}</span>
+      <span className="mt-2 block text-sm text-ink-soft">
+        Net {formatMoney(scenario.monthlyNet)} / month · {formatYears(scenario.breakEvenYears)}
+      </span>
+      <span className="mt-2 block text-xs leading-5 text-ink-soft">{scenario.sourceNote}</span>
+      {extra ? <span className="mt-1 block text-xs leading-5 text-ink-soft">{extra}</span> : null}
+    </label>
   );
 }

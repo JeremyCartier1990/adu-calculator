@@ -1,5 +1,6 @@
 import { validateLead } from "@/lib/lead";
 import { clientIp, RATE_LIMITS, takeToken } from "@/lib/rate-limit";
+import { verifiedPhoneFromRequest } from "@/lib/verify-cookie";
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
@@ -50,7 +51,7 @@ export async function POST(request: Request): Promise<Response> {
     JSON.stringify({
       event: "consultation_request",
       receivedAt: new Date().toISOString(),
-      lead: result.lead,
+      lead: { ...result.lead, verifiedPhone: verifiedPhoneFromRequest(request) },
     }),
   );
 

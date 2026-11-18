@@ -183,7 +183,15 @@ function readFacts(record: Record<string, unknown> | null): PropertyFacts {
     bathrooms: positive(record?.bathrooms),
     yearBuilt: yearBuilt(record?.yearBuilt),
     propertyType: text(record?.propertyType, 80),
+    latitude: coordinate(record?.latitude, -90, 90),
+    longitude: coordinate(record?.longitude, -180, 180),
   };
+}
+
+function coordinate(value: unknown, min: number, max: number): number | null {
+  const parsed = asNumber(value);
+  if (parsed == null || parsed < min || parsed > max) return null;
+  return parsed;
 }
 
 function firstRecord(body: unknown): Record<string, unknown> | null {
@@ -200,6 +208,8 @@ function fillGaps(primary: PropertyFacts, fallback: PropertyFacts): PropertyFact
     bathrooms: primary.bathrooms ?? fallback.bathrooms,
     yearBuilt: primary.yearBuilt ?? fallback.yearBuilt,
     propertyType: primary.propertyType ?? fallback.propertyType,
+    latitude: primary.latitude ?? fallback.latitude,
+    longitude: primary.longitude ?? fallback.longitude,
   };
 }
 

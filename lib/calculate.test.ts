@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ASSUMPTIONS, bedroomsForSqft, snapSqft } from "./assumptions";
-import { calculateEstimate, fallbackMonthlyRent, type EstimateInput } from "./calculate";
+import {
+  calculateEstimate,
+  clampOccupancy,
+  deriveNightlyRate,
+  fallbackMonthlyRent,
+  shortTermMonthlyGross,
+  type EstimateInput,
+} from "./calculate";
 
 function input(overrides: Partial<EstimateInput> = {}): EstimateInput {
   return {
@@ -114,4 +121,47 @@ test("payback is finite when income is positive and empty when rent is zero", ()
 test("fallback rent depends on size and derived bedrooms", () => {
   assert.equal(fallbackMonthlyRent(500, 1), Math.round(500 * 5.15));
   assert.equal(fallbackMonthlyRent(800, 2), Math.round(800 * 4.65));
+});
+
+test("short-term gross is nightly rate times 30.4 times occupancy", () => {
+  assert.equal(ASSUMPTIONS.shortTerm.daysPerMonth, 30.4);
+  assert.equal(ASSUMPTIONS.shortTerm.defaultOccupancy, 0.65);
+  assert.equal(deriveNightlyRate(3040, 2), 240);
+  assert.equal(shortTermMonthlyGross(240, 0.65), Math.round(240 * 30.4 * 0.65));
+  assert.equal(deriveNightlyRate(0, 2), ASSUMPTIONS.shortTerm.fallbackNightlyRate[2]);
+  assert.equal(clampOccupancy(0.1), ASSUMPTIONS.shortTerm.occupancyMin);
+  assert.equal(clampOccupancy(0.99), ASSUMPTIONS.shortTerm.occupancyMax);
+});
+
+test("short-term expenses come out of nightly revenue and do not call for a second rent", () => {
+  const estimate = calculateEstimate(
+    input({ monthlyRent: 3040, rentalUse: "short_term", strOccupancy: 0.65 }),
+  );
+  const str = estimate.scenarios.shortTerm;
+  const monthly = Math.round(240 * 30.4 * 0.65);
+  const annual = monthly * 12;
+  assert.equal(str.nightlyRate, 240);
+  assert.equal(str.monthlyGross, monthly);
+  assert.equal(str.annualGross, annual);
+  assert.equal(str.sourceNote, "Planning estimate, not RentCast data");
+  const platform = Math.round(annual * ASSUMPTIONS.shortTerm.platformFeeRate);
+  const management = Math.round(annual * ASSUMPTIONS.shortTerm.managementRate);
+  assert.equal(str.lines.find((line) => line.label === "Platform fee")?.amount, platform);
+  assert.equal(str.lines.find((line) => line.label === "Management")?.amount, management);
+  assert.ok((str.lines.find((line) => line.label === "Cleaning")?.amount ?? 0) > 0);
+  assert.ok(str.annualNet < str.annualGross - platform - management);
+  assert.equal(estimate.annualNet, str.annualNet);
+  assert.equal(estimate.series[1]?.net, str.annualNet);
+  assert.notEqual(estimate.scenarios.longTerm.annualNet, str.annualNet);
+  assert.ok(estimate.notes.join(" ").includes("not RentCast"));
+});
+
+test("selecting the short-term scenario changes payback and the income approach", () => {
+  const longTerm = calculateEstimate(input({ monthlyRent: 3040, rentalUse: "long_term" }));
+  const shortTerm = calculateEstimate(input({ monthlyRent: 3040, rentalUse: "short_term" }));
+  assert.equal(longTerm.incomeUplift, longTerm.scenarios.longTerm.incomeUplift);
+  assert.equal(shortTerm.incomeUplift, shortTerm.scenarios.shortTerm.incomeUplift);
+  assert.notEqual(longTerm.breakEvenYears, shortTerm.breakEvenYears);
+  assert.equal(longTerm.sqftUplift, shortTerm.sqftUplift);
+  assert.notEqual(longTerm.blendedUplift, shortTerm.blendedUplift);
 });
