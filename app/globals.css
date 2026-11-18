@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f3eee6;
+  --paper-deep: #e7dfd2;
+  --surface: #fffcf8;
+  --ink: #1c1915;
+  --ink-soft: #443f38;
+  --line: #e0d5c6;
+  --clay: #9a3412;
+  --clay-dark: #7c280e;
+  --pine: #234237;
+  --pine-soft: #e6f0ea;
+  --good: #14613d;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-clay: var(--clay);
+  --color-clay-dark: var(--clay-dark);
+  --color-pine: var(--pine);
+  --color-pine-soft: var(--pine-soft);
+  --color-good: var(--good);
+  --font-sans: var(--font-outfit), "Avenir Next", "Segoe UI", sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
+}
+
+body {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(ellipse at 0% -10%, rgba(154, 52, 18, 0.08), transparent 42%),
+    radial-gradient(ellipse at 100% 0%, rgba(35, 66, 55, 0.09), transparent 38%);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: #efd3c6;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 50;
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 0.5rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 1rem;
+  outline: 2px solid var(--pine);
+  outline-offset: 2px;
+}
+
+input[type="range"] {
+  accent-color: #234237;
+  width: 100%;
+  height: 1.75rem;
+}
