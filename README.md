@@ -65,6 +65,10 @@ The RentCast plan this was built for allows about 50 requests a month. Repeating
 
 Do not hammer the sample address against a live key. A full pass is two property calls plus one rent call. Tests use mocked responses and do not touch the network.
 
+Short-term rental income is not a RentCast call. The fallback is a planning model in `lib/assumptions.ts`: nightly rate = long-term monthly rent ÷ 30.4 × 2.4, occupancy defaults to 65%, and the gross is nightly rate × 30.4 × occupancy. Platform fees, management, cleaning, supplies, utilities, and a higher insurance rate are taken out so the comparison with a 12-month lease is not one-sided. The homeowner can edit the nightly rate and occupancy. Payback and the income approach follow whichever scenario is selected.
+
+Real short-term comps come from AirROI `GET /calculator/estimate` with header `X-API-KEY` (`AIRROI_API_KEY`). That call runs only after the visitor verifies a phone by SMS through Twilio Verify (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`). A signed httpOnly cookie (`VERIFY_COOKIE_SECRET`, 12 hours) is what `/api/str` checks. Results are cached for 24 hours. If those env vars are missing, the page keeps the planning estimate and still builds. RentCast stays available without phone verification.
+
 ## Lead form
 
 `POST /api/lead` checks the name, phone, email, and address, drops a filled honeypot, and logs a sanitized payload. Nothing is stored. The route is marked `TODO(crm)` for a later handoff to HubSpot, GoHighLevel, or the company pipeline.

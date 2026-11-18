@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LeadForm } from "@/components/lead-form";
 import { ResultsPanel } from "@/components/results-panel";
 import { validateAddress, normalizeAddress } from "@/lib/address";
@@ -15,7 +15,7 @@ import {
   type FinishLevelId,
   type ProjectTypeId,
 } from "@/lib/assumptions";
-import { calculateEstimate, fallbackMonthlyRent, type RentSource } from "@/lib/calculate";
+import { calculateEstimate, fallbackMonthlyRent, type RentalUse, type RentSource } from "@/lib/calculate";
 import type { EstimateSnapshot } from "@/lib/lead";
 import { dollars, parsePositive } from "@/lib/money";
 import { SAMPLE_ADDRESS, SAMPLE_FACTS } from "@/lib/sample-home";
@@ -78,6 +78,18 @@ export function Estimator() {
   const [rentByKey, setRentByKey] = useState<Record<string, RentHit>>({});
   const [pendingRentKey, setPendingRentKey] = useState<string | null>(null);
   const [rentNote, setRentNote] = useState<string | null>(null);
+  const [rentalUse, setRentalUse] = useState<RentalUse>("long_term");
+  const [occupancyPercent, setOccupancyPercent] = useState(
+    Math.round(ASSUMPTIONS.shortTerm.defaultOccupancy * 100),
+  );
+  const [nightlyOverride, setNightlyOverride] = useState<string | null>(null);
+  const [location, setLocation] = useState<{ latitude: number | null; longitude: number | null }>({
+    latitude: null,
+    longitude: null,
+  });
+  const [marketNumbers, setMarketNumbers] = useState<{ adr: number; occupancy: number } | null>(null);
+  const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  const occupancyTouchedRef = useRef(false);
 
   const liveRef = useRef(false);
   const overrideRef = useRef<string | null>(null);
@@ -128,6 +140,16 @@ export function Estimator() {
     rentSource = "assumption";
   }
 
+  const nightlyTyped = nightlyOverride == null ? null : parsePositive(nightlyOverride);
+  const onMarketNumbers = useCallback((numbers: { adr: number; occupancy: number } | null) => {
+    setMarketNumbers(numbers);
+    if (numbers && !occupancyTouchedRef.current) {
+      setOccupancyPercent(Math.round(numbers.occupancy * 100));
+    }
+  }, []);
+  const onVerifiedPhone = useCallback((phone: string | null) => {
+    setVerifiedPhone(phone);
+  }, []);
   const estimate = calculateEstimate({
     projectType,
     finish,
@@ -139,6 +161,9 @@ export function Estimator() {
     homeSquareFootage: parsePositive(facts.squareFootage),
     homeValue: parsePositive(facts.homeValue),
     lotSize: parsePositive(facts.lotSize),
+    rentalUse,
+    strOccupancy: occupancyPercent / 100,
+    strNightlyRate: nightlyTyped ?? marketNumbers?.adr ?? null,
   });
 
   const snapshot: EstimateSnapshot = {
@@ -152,6 +177,8 @@ export function Estimator() {
     annualNet: estimate.annualNet,
     breakEvenYears: estimate.breakEvenYears,
     equity: estimate.equity,
+    rentalUse: estimate.rentalUse,
+    strMonthlyGross: estimate.scenarios.shortTerm.monthlyGross,
   };
 
   function scheduleRent(nextAddress: string, nextSqft: number, delay: number) {
@@ -232,6 +259,13 @@ export function Estimator() {
           ? { low: data.value.priceRangeLow, high: data.value.priceRangeHigh }
           : null,
       );
+      setLocation({
+        latitude: data.property.latitude,
+        longitude: data.property.longitude,
+      });
+      if (data.property.latitude == null || data.property.longitude == null) {
+        setMarketNumbers(null);
+      }
       setOrigin("rentcast");
       setFactsEdited(false);
       setLiveData(true);
@@ -259,6 +293,8 @@ export function Estimator() {
   function loadSample() {
     if (timerRef.current) clearTimeout(timerRef.current);
     lookupSeq.current += 1;
+    setLocation({ latitude: null, longitude: null });
+    setMarketNumbers(null);
     setAddress(SAMPLE_ADDRESS);
     setFacts(SAMPLE_FACTS);
     setValueRange(null);
@@ -503,10 +539,27 @@ export function Estimator() {
             </fieldset>
           </div>
 
-          <ResultsPanel estimate={estimate} />
+          <ResultsPanel
+            estimate={estimate}
+            onRentalUse={setRentalUse}
+            occupancyPercent={occupancyPercent}
+            onOccupancyPercent={(value) => {
+              occupancyTouchedRef.current = true;
+              setOccupancyPercent(value);
+            }}
+            nightlyRateInput={nightlyOverride ?? String(estimate.scenarios.shortTerm.nightlyRate ?? "")}
+            onNightlyRateInput={setNightlyOverride}
+            nightlyIsCustom={nightlyOverride !== null}
+            onResetNightly={() => setNightlyOverride(null)}
+            usingAirroi={marketNumbers != null && nightlyOverride == null}
+            latitude={location.latitude}
+            longitude={location.longitude}
+            onMarketNumbers={onMarketNumbers}
+            onVerifiedPhone={onVerifiedPhone}
+          />
         </div>
       </section>
-      <LeadForm addressHint={address} snapshot={snapshot} />
+      <LeadForm addressHint={address} snapshot={snapshot} verifiedPhone={verifiedPhone} />
     </>
   );
 }

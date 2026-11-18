@@ -6,6 +6,8 @@ export type PropertyFacts = {
   bathrooms: number | null;
   yearBuilt: number | null;
   propertyType: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type ValueFacts = {

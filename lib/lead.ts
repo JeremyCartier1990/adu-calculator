@@ -1,4 +1,6 @@
 import type { FinishLevelId, ProjectTypeId } from "./assumptions";
+import type { RentalUse } from "./calculate";
+import { normalizePhone } from "./phone";
 
 export type EstimateSnapshot = {
   projectType: ProjectTypeId;
@@ -11,6 +13,8 @@ export type EstimateSnapshot = {
   annualNet: number;
   breakEvenYears: number | null;
   equity: number;
+  rentalUse: RentalUse;
+  strMonthlyGross: number;
 };
 
 export type SanitizedLead = {
@@ -45,11 +49,7 @@ export function cleanText(value: string, max: number): string {
 }
 
 function cleanPhone(value: string): string | null {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
-  return null;
+  return normalizePhone(value);
 }
 
 function cleanEmail(value: string): string | null {
@@ -94,6 +94,8 @@ function parseSnapshot(value: unknown): EstimateSnapshot | null {
   ) {
     return null;
   }
+  const rentalUse: RentalUse = record.rentalUse === "short_term" ? "short_term" : "long_term";
+  const strMonthlyGross = finiteNumber(record.strMonthlyGross, 0, 500000) ?? 0;
   return {
     projectType: projectType as ProjectTypeId,
     projectLabel,
@@ -105,6 +107,8 @@ function parseSnapshot(value: unknown): EstimateSnapshot | null {
     annualNet,
     breakEvenYears,
     equity,
+    rentalUse,
+    strMonthlyGross,
   };
 }
 

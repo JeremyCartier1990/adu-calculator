@@ -7,13 +7,15 @@ import { formatMoney } from "@/lib/money";
 type LeadFormProps = {
   addressHint: string;
   snapshot: EstimateSnapshot;
+  verifiedPhone: string | null;
 };
 
 type FieldErrors = Partial<Record<"name" | "phone" | "email" | "address" | "form", string>>;
 
-export function LeadForm({ addressHint, snapshot }: LeadFormProps) {
+export function LeadForm({ addressHint, snapshot, verifiedPhone }: LeadFormProps) {
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(verifiedPhone ?? "");
+  const [phoneEdited, setPhoneEdited] = useState(false);
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState(addressHint);
   const [addressEdited, setAddressEdited] = useState(false);
@@ -24,6 +26,7 @@ export function LeadForm({ addressHint, snapshot }: LeadFormProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const addressValue = addressEdited ? address : addressHint || address;
+  const phoneValue = phoneEdited ? phone : verifiedPhone || phone;
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,7 +38,7 @@ export function LeadForm({ addressHint, snapshot }: LeadFormProps) {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           name,
-          phone,
+          phone: phoneValue,
           email,
           address: addressValue,
           companyWebsite: honeypot,
@@ -74,7 +77,8 @@ export function LeadForm({ addressHint, snapshot }: LeadFormProps) {
           </p>
           <p className="mt-6 text-sm leading-6 text-[#d5e4dc]">
             Current estimate: {snapshot.projectLabel}, {snapshot.sqft.toLocaleString("en-US")} sqft, about{" "}
-            {formatMoney(snapshot.totalCost)}.
+            {formatMoney(snapshot.totalCost)}. Payback uses the{" "}
+            {snapshot.rentalUse === "short_term" ? "short-term rental" : "long-term lease"}.
           </p>
         </div>
 
@@ -110,9 +114,12 @@ export function LeadForm({ addressHint, snapshot }: LeadFormProps) {
                 label="Phone"
                 autoComplete="tel"
                 inputMode="tel"
-                value={phone}
+                value={phoneValue}
                 error={errors.phone}
-                onChange={setPhone}
+                onChange={(value) => {
+                  setPhoneEdited(true);
+                  setPhone(value);
+                }}
               />
               <Field
                 id="lead-email"

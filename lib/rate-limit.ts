@@ -43,4 +43,9 @@ export const RATE_LIMITS = {
   property: { limit: 6, windowMs: 60 * 60 * 1000 },
   rent: { limit: 12, windowMs: 60 * 60 * 1000 },
   lead: { limit: 8, windowMs: 60 * 60 * 1000 },
+  verifySendIp: { limit: 5, windowMs: 60 * 60 * 1000 },
+  verifySendPhone: { limit: 3, windowMs: 60 * 60 * 1000 },
+  verifyCheckIp: { limit: 10, windowMs: 60 * 60 * 1000 },
+  verifyCheckPhone: { limit: 6, windowMs: 60 * 60 * 1000 },
+  str: { limit: 8, windowMs: 60 * 60 * 1000 },
 } as const;

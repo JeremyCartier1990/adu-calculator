@@ -4,12 +4,14 @@ import {
   bedroomsForSqft,
   finishTitle,
   projectTitle,
+  type BedroomCount,
   type FinishLevelId,
   type ProjectTypeId,
 } from "./assumptions";
 import { dollars, formatMoney } from "./money";
 
 export type RentSource = "rentcast" | "assumption" | "manual";
+export type RentalUse = "long_term" | "short_term";
 
 export type EstimateInput = {
   projectType: ProjectTypeId;
@@ -22,6 +24,12 @@ export type EstimateInput = {
   homeSquareFootage: number | null;
   homeValue: number | null;
   lotSize: number | null;
+  /** Which scenario drives payback, the chart, and the income approach. */
+  rentalUse?: RentalUse;
+  /** Null uses the Los Angeles default. */
+  strOccupancy?: number | null;
+  /** Null derives a nightly rate from the long-term rent. */
+  strNightlyRate?: number | null;
 };
 
 export type CashPoint = {
@@ -37,6 +45,30 @@ export type YearOne = {
   insurance: number;
   propertyTax: number;
   net: number;
+};
+
+export type ExpenseLine = {
+  label: string;
+  amount: number;
+  hint?: string;
+};
+
+export type RentalScenario = {
+  id: RentalUse;
+  label: string;
+  summary: string;
+  sourceNote: string;
+  monthlyGross: number;
+  nightlyRate: number | null;
+  occupancy: number | null;
+  annualGross: number;
+  lines: ExpenseLine[];
+  annualNet: number;
+  monthlyNet: number;
+  simplePaybackYears: number | null;
+  breakEvenYears: number | null;
+  series: CashPoint[];
+  incomeUplift: number | null;
 };
 
 export type Estimate = {
@@ -73,6 +105,11 @@ export type Estimate = {
   equity: number;
   warnings: string[];
   notes: string[];
+  rentalUse: RentalUse;
+  scenarios: {
+    longTerm: RentalScenario;
+    shortTerm: RentalScenario;
+  };
 };
 
 function clampSqft(sqft: number): number {
@@ -90,28 +127,6 @@ function usableHomeValue(value: number | null): number | null {
   return value;
 }
 
-type YearParts = YearOne;
-
-function yearParts(year: number, sqft: number, monthlyRent: number, total: number): YearParts {
-  const ops = ASSUMPTIONS.operations;
-  const rentGrowth = (1 + ops.rentGrowthRate) ** (year - 1);
-  const expenseGrowth = (1 + ops.expenseGrowthRate) ** (year - 1);
-  const taxGrowth = (1 + ops.propertyTaxGrowthRate) ** (year - 1);
-  const gross = dollars(monthlyRent * 12 * rentGrowth);
-  const vacancy = dollars(gross * ops.vacancyRate);
-  const maintenance = dollars(gross * ops.maintenanceRate);
-  const insurance = dollars(sqft * ops.insurancePerSqftYear * expenseGrowth);
-  const propertyTax = dollars(total * ops.propertyTaxRate * taxGrowth);
-  return {
-    gross,
-    vacancy,
-    maintenance,
-    insurance,
-    propertyTax,
-    net: gross - vacancy - maintenance - insurance - propertyTax,
-  };
-}
-
 function breakEvenYear(series: CashPoint[]): number | null {
   for (let index = 1; index < series.length; index += 1) {
     const previous = series[index - 1]?.cumulative ?? 0;
@@ -127,9 +142,137 @@ function breakEvenYear(series: CashPoint[]): number | null {
 }
 
 export function fallbackMonthlyRent(sqft: number, bedrooms: number): number {
-  const count = (bedrooms < 0 ? 0 : bedrooms > 3 ? 3 : bedrooms) as 0 | 1 | 2 | 3;
+  const count = bedroomCount(bedrooms);
   const rate = ASSUMPTIONS.rent.fallbackMonthlyPerSqft[count];
   return dollars(clampSqft(sqft) * rate);
+}
+
+function bedroomCount(bedrooms: number): BedroomCount {
+  if (bedrooms <= 0) return 0;
+  if (bedrooms >= 3) return 3;
+  return Math.round(bedrooms) as BedroomCount;
+}
+
+function percentLabel(rate: number): string {
+  return `${Math.round(rate * 100)}%`;
+}
+
+export function clampOccupancy(occupancy: number): number {
+  const { occupancyMin, occupancyMax, defaultOccupancy } = ASSUMPTIONS.shortTerm;
+  if (!Number.isFinite(occupancy)) return defaultOccupancy;
+  return Math.min(occupancyMax, Math.max(occupancyMin, occupancy));
+}
+
+/** Nightly rate from the long-term monthly rent, or a bedroom fallback when rent is missing. */
+export function deriveNightlyRate(monthlyLongTermRent: number, bedrooms: number): number {
+  const { daysPerMonth, nightlyFromMonthlyMultiplier, fallbackNightlyRate } = ASSUMPTIONS.shortTerm;
+  if (Number.isFinite(monthlyLongTermRent) && monthlyLongTermRent > 0) {
+    return dollars((monthlyLongTermRent / daysPerMonth) * nightlyFromMonthlyMultiplier);
+  }
+  return fallbackNightlyRate[bedroomCount(bedrooms)];
+}
+
+/** Monthly short-term gross = nightly rate × 30.4 × occupancy. */
+export function shortTermMonthlyGross(nightlyRate: number, occupancy: number): number {
+  return dollars(nightlyRate * ASSUMPTIONS.shortTerm.daysPerMonth * clampOccupancy(occupancy));
+}
+
+type YearFlow = {
+  gross: number;
+  lines: ExpenseLine[];
+  net: number;
+};
+
+function longTermYear(year: number, sqft: number, monthlyRent: number, total: number): YearFlow {
+  const ops = ASSUMPTIONS.operations;
+  const rentGrowth = (1 + ops.rentGrowthRate) ** (year - 1);
+  const expenseGrowth = (1 + ops.expenseGrowthRate) ** (year - 1);
+  const taxGrowth = (1 + ops.propertyTaxGrowthRate) ** (year - 1);
+  const gross = dollars(monthlyRent * 12 * rentGrowth);
+  const vacancy = dollars(gross * ops.vacancyRate);
+  const maintenance = dollars(gross * ops.maintenanceRate);
+  const insurance = dollars(sqft * ops.insurancePerSqftYear * expenseGrowth);
+  const propertyTax = dollars(total * ops.propertyTaxRate * taxGrowth);
+  const lines: ExpenseLine[] = [
+    { label: "Vacancy", amount: vacancy, hint: `${percentLabel(ops.vacancyRate)} of gross` },
+    { label: "Maintenance", amount: maintenance, hint: `${percentLabel(ops.maintenanceRate)} of gross` },
+    { label: "Insurance", amount: insurance },
+    { label: "Added property tax", amount: propertyTax, hint: "1.2% of project cost" },
+  ];
+  return {
+    gross,
+    lines,
+    net: gross - vacancy - maintenance - insurance - propertyTax,
+  };
+}
+
+function shortTermYear(
+  year: number,
+  sqft: number,
+  total: number,
+  nightlyRate: number,
+  occupancy: number,
+  bedrooms: BedroomCount,
+): YearFlow {
+  const str = ASSUMPTIONS.shortTerm;
+  const ops = ASSUMPTIONS.operations;
+  const rentGrowth = (1 + ops.rentGrowthRate) ** (year - 1);
+  const expenseGrowth = (1 + ops.expenseGrowthRate) ** (year - 1);
+  const taxGrowth = (1 + ops.propertyTaxGrowthRate) ** (year - 1);
+  const monthlyGross = dollars(nightlyRate * str.daysPerMonth * occupancy);
+  const gross = dollars(monthlyGross * 12 * rentGrowth);
+  const platform = dollars(gross * str.platformFeeRate);
+  const management = dollars(gross * str.managementRate);
+  const repairs = dollars(gross * str.maintenanceRate);
+  const occupiedNights = str.daysPerMonth * occupancy;
+  const turnovers = occupiedNights / str.averageStayNights;
+  const cleaning = dollars(turnovers * 12 * str.cleaningPerTurnover[bedrooms] * expenseGrowth);
+  const supplies = dollars(turnovers * 12 * str.suppliesPerTurnover * expenseGrowth);
+  const utilities = dollars(occupiedNights * 12 * str.utilitiesPerOccupiedNight * expenseGrowth);
+  const insurance = dollars(sqft * str.insurancePerSqftYear * expenseGrowth);
+  const propertyTax = dollars(total * ops.propertyTaxRate * taxGrowth);
+  const lines: ExpenseLine[] = [
+    { label: "Platform fee", amount: platform, hint: `${percentLabel(str.platformFeeRate)} of gross` },
+    { label: "Management", amount: management, hint: `${percentLabel(str.managementRate)} of gross` },
+    { label: "Repairs", amount: repairs, hint: `${percentLabel(str.maintenanceRate)} of gross, separate from cleaning` },
+    { label: "Cleaning", amount: cleaning, hint: `One visit per ${str.averageStayNights}-night stay` },
+    { label: "Supplies", amount: supplies, hint: "Per turnover" },
+    { label: "Utilities", amount: utilities, hint: `${formatMoney(str.utilitiesPerOccupiedNight)} per occupied night` },
+    { label: "Insurance", amount: insurance, hint: "Short-term policy, higher than a standard landlord policy" },
+    { label: "Added property tax", amount: propertyTax, hint: "1.2% of project cost" },
+  ];
+  const net = gross - lines.reduce((sum, line) => sum + line.amount, 0);
+  return { gross, lines, net };
+}
+
+function projectScenario(
+  total: number,
+  yearFlow: (year: number) => YearFlow,
+): Pick<
+  RentalScenario,
+  "annualGross" | "lines" | "annualNet" | "monthlyNet" | "simplePaybackYears" | "breakEvenYears" | "series"
+> {
+  const years = ASSUMPTIONS.operations.projectionYears;
+  const series: CashPoint[] = [{ year: 0, net: 0, cumulative: -total }];
+  let cumulative = -total;
+  let first: YearFlow | null = null;
+  for (let year = 1; year <= years; year += 1) {
+    const flow = yearFlow(year);
+    if (year === 1) first = flow;
+    cumulative += flow.net;
+    series.push({ year, net: flow.net, cumulative });
+  }
+  const annualNet = first?.net ?? 0;
+  const annualGross = first?.gross ?? 0;
+  return {
+    annualGross,
+    lines: first?.lines ?? [],
+    annualNet,
+    monthlyNet: dollars(annualNet / 12),
+    simplePaybackYears: annualNet > 0 ? total / annualNet : null,
+    breakEvenYears: annualNet > 0 ? breakEvenYear(series) : null,
+    series,
+  };
 }
 
 export function calculateEstimate(input: EstimateInput): Estimate {
@@ -155,24 +298,27 @@ export function calculateEstimate(input: EstimateInput): Estimate {
   const permitsAndFees = cityFees + schoolFees + utilityFees;
   const total = construction + design + permitsAndFees;
 
-  const years = ASSUMPTIONS.operations.projectionYears;
-  const series: CashPoint[] = [{ year: 0, net: 0, cumulative: -total }];
-  let cumulative = -total;
-  let yearOne: YearParts | null = null;
-  for (let year = 1; year <= years; year += 1) {
-    const parts = yearParts(year, sqft, monthlyRent, total);
-    if (year === 1) yearOne = parts;
-    cumulative += parts.net;
-    series.push({ year, net: parts.net, cumulative });
-  }
-  if (!yearOne) {
-    yearOne = yearParts(1, sqft, monthlyRent, total);
-  }
+  const rentalUse = input.rentalUse ?? "long_term";
+  const occupancy = clampOccupancy(input.strOccupancy ?? ASSUMPTIONS.shortTerm.defaultOccupancy);
+  const nightlyRate =
+    input.strNightlyRate != null && input.strNightlyRate > 0
+      ? dollars(input.strNightlyRate)
+      : deriveNightlyRate(monthlyRent, bedrooms);
+  const strMonthly = shortTermMonthlyGross(nightlyRate, occupancy);
 
-  const annualNet = yearOne.net;
-  const monthlyNet = dollars(annualNet / 12);
-  const simplePaybackYears = annualNet > 0 ? total / annualNet : null;
-  const breakEvenYears = annualNet > 0 ? breakEvenYear(series) : null;
+  const longTermFlow = projectScenario(total, (year) => longTermYear(year, sqft, monthlyRent, total));
+  const shortTermFlow = projectScenario(total, (year) =>
+    shortTermYear(year, sqft, total, nightlyRate, occupancy, bedrooms),
+  );
+  const longTermYearOne = longTermYear(1, sqft, monthlyRent, total);
+  const yearOne: YearOne = {
+    gross: longTermYearOne.gross,
+    vacancy: longTermYearOne.lines[0]?.amount ?? 0,
+    maintenance: longTermYearOne.lines[1]?.amount ?? 0,
+    insurance: longTermYearOne.lines[2]?.amount ?? 0,
+    propertyTax: longTermYearOne.lines[3]?.amount ?? 0,
+    net: longTermYearOne.net,
+  };
 
   const homeSize = usableHomeSize(input.homeSquareFootage);
   const homeValue = usableHomeValue(input.homeValue);
@@ -182,12 +328,20 @@ export function calculateEstimate(input: EstimateInput): Estimate {
     : ASSUMPTIONS.value.fallbackValuePerSqft;
   const factor = ASSUMPTIONS.value.sqftFactor[projectType];
   const sqftUplift = dollars(valuePerSqftExact * sqft * factor);
-  const incomeUplift = annualNet > 0 ? dollars(annualNet / ASSUMPTIONS.value.capRate) : null;
   const weight = ASSUMPTIONS.value.sqftApproachWeight;
-  const blendedUplift =
+  const capRate = ASSUMPTIONS.value.capRate;
+  const incomeFor = (annualNet: number) => (annualNet > 0 ? dollars(annualNet / capRate) : null);
+  const blendFor = (incomeUplift: number | null) =>
     incomeUplift == null ? sqftUplift : dollars(weight * sqftUplift + (1 - weight) * incomeUplift);
+
+  const longTermIncome = incomeFor(longTermFlow.annualNet);
+  const shortTermIncome = incomeFor(shortTermFlow.annualNet);
+  const activeFlow = rentalUse === "short_term" ? shortTermFlow : longTermFlow;
+  const incomeUplift = rentalUse === "short_term" ? shortTermIncome : longTermIncome;
+  const blendedUplift = blendFor(incomeUplift);
   const equity = blendedUplift - total;
   const newHomeValue = homeValue != null ? homeValue + blendedUplift : null;
+  const annualNet = activeFlow.annualNet;
 
   const warnings: string[] = [];
   if (!providedBoth) {
@@ -216,7 +370,11 @@ export function calculateEstimate(input: EstimateInput): Estimate {
     );
   }
   if (annualNet <= 0) {
-    warnings.push("At this rent and these expenses, the ADU does not show positive income, so there is no payback period.");
+    warnings.push(
+      rentalUse === "short_term"
+        ? "At this nightly rate, occupancy, and these expenses, the short-term rental does not show positive income, so there is no payback period."
+        : "At this rent and these expenses, the long-term lease does not show positive income, so there is no payback period.",
+    );
   }
 
   const ops = ASSUMPTIONS.operations;
@@ -227,11 +385,43 @@ export function calculateEstimate(input: EstimateInput): Estimate {
     schoolFees === 0
       ? `School and impact fees are $0 because this ADU is under ${ASSUMPTIONS.permits.impactFeeExemptBelowSqft} sqft.`
       : `School and impact fees are ${formatMoney(ASSUMPTIONS.permits.schoolFeePerSqft)} per square foot because this ADU is ${ASSUMPTIONS.permits.impactFeeExemptBelowSqft} sqft or larger.`,
-    `Vacancy is ${Math.round(ops.vacancyRate * 100)}% of gross rent. Maintenance is ${Math.round(ops.maintenanceRate * 100)}% of gross rent. Insurance is ${formatMoney(ops.insurancePerSqftYear)} per square foot per year.`,
+    `Long-term rent is a 12-month lease. Vacancy is ${percentLabel(ops.vacancyRate)} of gross rent. Maintenance is ${percentLabel(ops.maintenanceRate)} of gross rent. Insurance is ${formatMoney(ops.insurancePerSqftYear)} per square foot per year.`,
+    `Short-term gross is nightly rate × ${ASSUMPTIONS.shortTerm.daysPerMonth} × occupancy. The default nightly rate is ${ASSUMPTIONS.shortTerm.nightlyFromMonthlyMultiplier}× the long-term monthly rent divided by ${ASSUMPTIONS.shortTerm.daysPerMonth} days. Default occupancy is ${percentLabel(ASSUMPTIONS.shortTerm.defaultOccupancy)}. Platform fee is ${percentLabel(ASSUMPTIONS.shortTerm.platformFeeRate)}, management ${percentLabel(ASSUMPTIONS.shortTerm.managementRate)}, repairs ${percentLabel(ASSUMPTIONS.shortTerm.maintenanceRate)}. Cleaning and supplies assume a ${ASSUMPTIONS.shortTerm.averageStayNights}-night stay. This is a planning estimate, not RentCast data.`,
     `Added property tax is ${(ops.propertyTaxRate * 100).toFixed(1)}% of total project cost in year one, then grows at ${Math.round(ops.propertyTaxGrowthRate * 100)}% a year. Insurance grows at ${ops.expenseGrowthRate * 100}%. Rent grows at ${Math.round(ops.rentGrowthRate * 100)}%.`,
     `The chart's payback is the year cumulative cash flow crosses zero. Simple payback is total cost divided by year-one net income, with no growth.`,
-    `Added value blends ${Math.round(weight * 100)}% of the square-foot approach (${Math.round(factor * 100)}% of home value per square foot × ADU size) with ${Math.round((1 - weight) * 100)}% of the income approach (year-one net income ÷ a ${(ASSUMPTIONS.value.capRate * 100).toFixed(1)}% cap rate). If net income is not positive, only the square-foot approach is used.`,
+    `Added value blends ${Math.round(weight * 100)}% of the square-foot approach (${Math.round(factor * 100)}% of home value per square foot × ADU size) with ${Math.round((1 - weight) * 100)}% of the income approach (year-one net income for the selected rental ÷ a ${(capRate * 100).toFixed(1)}% cap rate). If that net income is not positive, only the square-foot approach is used.`,
+    "Short-term rentals of ADUs may be restricted. Los Angeles's home-sharing ordinance limits registration, primary-residence use, and night caps. Confirm the rules for the address before counting on nightly income.",
   ];
+
+  const rentSourceNote =
+    input.rentSource === "rentcast"
+      ? "RentCast long-term rent estimate"
+      : input.rentSource === "manual"
+        ? "Long-term rent you entered"
+        : "Los Angeles planning rate for a 12-month lease";
+
+  const longTerm: RentalScenario = {
+    id: "long_term",
+    label: "Long-term rent (12-month lease)",
+    summary: "Gross monthly rent",
+    sourceNote: rentSourceNote,
+    monthlyGross: monthlyRent,
+    nightlyRate: null,
+    occupancy: null,
+    incomeUplift: longTermIncome,
+    ...longTermFlow,
+  };
+  const shortTerm: RentalScenario = {
+    id: "short_term",
+    label: `Short-term rental (nightly, ${percentLabel(occupancy)} occupancy)`,
+    summary: "Gross monthly revenue",
+    sourceNote: "Planning estimate, not RentCast data",
+    monthlyGross: strMonthly,
+    nightlyRate,
+    occupancy,
+    incomeUplift: shortTermIncome,
+    ...shortTermFlow,
+  };
 
   return {
     projectType,
@@ -254,10 +444,10 @@ export function calculateEstimate(input: EstimateInput): Estimate {
     rentSource: input.rentSource,
     yearOne,
     annualNet,
-    monthlyNet,
-    simplePaybackYears,
-    breakEvenYears,
-    series,
+    monthlyNet: activeFlow.monthlyNet,
+    simplePaybackYears: activeFlow.simplePaybackYears,
+    breakEvenYears: activeFlow.breakEvenYears,
+    series: activeFlow.series,
     valuePerSqft: dollars(valuePerSqftExact),
     usedFallbackValuePerSqft: !providedBoth,
     sqftUplift,
@@ -267,5 +457,7 @@ export function calculateEstimate(input: EstimateInput): Estimate {
     equity,
     warnings,
     notes,
+    rentalUse,
+    scenarios: { longTerm, shortTerm },
   };
 }

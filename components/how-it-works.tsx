@@ -9,7 +9,7 @@ const STEPS = [
   },
   {
     title: "Read the estimate",
-    text: "Construction, plans, and permits. Rent after vacancy, maintenance, insurance, and added tax. Then payback and the value the new space may add.",
+    text: "Construction, plans, and permits. Compare a 12-month lease with a nightly rental, then read payback and the value the new space may add.",
   },
 ];
 

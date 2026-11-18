@@ -128,6 +128,39 @@ export const ASSUMPTIONS = {
      */
     lookupSubjectAttributes: false,
   },
+  /**
+   * Short-term (nightly) rental. RentCast has no occupancy or nightly-rate
+   * data, so this whole block is a planning model. Tune it here.
+   *
+   * Monthly gross = nightly rate × daysPerMonth × occupancy.
+   * The default nightly rate is the long-term monthly rent divided by
+   * daysPerMonth, then multiplied. That keeps the two scenarios tied to the
+   * same home instead of inventing a second market study.
+   */
+  shortTerm: {
+    daysPerMonth: 30.4,
+    nightlyFromMonthlyMultiplier: 2.4,
+    /** Used only when there is no long-term rent to scale from. */
+    fallbackNightlyRate: { 0: 145, 1: 185, 2: 240, 3: 295 } as Record<BedroomCount, number>,
+    /** Los Angeles planning default. The page lets the homeowner edit this. */
+    defaultOccupancy: 0.65,
+    occupancyMin: 0.2,
+    occupancyMax: 0.95,
+    /** Used to turn occupied nights into cleaning visits. */
+    averageStayNights: 3,
+    /** Host-paid platform and payment fees, as a share of gross. */
+    platformFeeRate: 0.15,
+    /** Full-service short-term management. Long-term does not charge this. */
+    managementRate: 0.2,
+    /** Repairs, separate from turnover cleaning. */
+    maintenanceRate: 0.03,
+    cleaningPerTurnover: { 0: 120, 1: 160, 2: 210, 3: 270 } as Record<BedroomCount, number>,
+    suppliesPerTurnover: 35,
+    /** Host pays utilities while the ADU is occupied. */
+    utilitiesPerOccupiedNight: 14,
+    /** Short-term policies cost more than a standard landlord policy. */
+    insurancePerSqftYear: 1.45,
+  },
   size: {
     min: 300,
     max: 1200,
@@ -147,6 +180,12 @@ export const ASSUMPTIONS = {
   cacheTtlMs: 24 * 60 * 60 * 1000,
   cacheTtlSeconds: 24 * 60 * 60,
 } as const;
+
+/** Short-term guest count for the ADU itself: a studio sleeps 2, otherwise two guests per bedroom. */
+export function guestsForBedrooms(bedrooms: number): number {
+  if (!Number.isFinite(bedrooms) || bedrooms <= 0) return 2;
+  return Math.min(16, Math.max(1, Math.round(bedrooms) * 2));
+}
 
 export function bedroomsForSqft(sqft: number): BedroomCount {
   const breaks = ASSUMPTIONS.size.bedroomBreaks;
