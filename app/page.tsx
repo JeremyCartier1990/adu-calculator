@@ -1,5 +1,5 @@
 import { Funnel } from "@/components/funnel/funnel";
-import { Faq, FinalCta, HowItWorks, ReportContents } from "@/components/landing";
+import { Designs, Faq, FinalCta, HowItWorks, ReportContents } from "@/components/landing";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
@@ -10,6 +10,7 @@ export default function HomePage() {
       <main>
         <Funnel />
         <HowItWorks />
+        <Designs />
         <ReportContents />
         <Faq />
         <FinalCta />

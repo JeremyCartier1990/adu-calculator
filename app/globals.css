@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 /*
- * ADU ROI Calculator brand tokens. Warm white, near-black ink, one Pacific
- * accent (pine) and a sunset secondary (clay). Component classes use these
- * names, so a palette change happens here only.
+ * ADU ROI Calculator brand tokens: an architect's palette of warm cream and
+ * charcoal, one Pacific accent (pine) and a sunset secondary (clay).
+ * Component classes use these names, so a palette change happens here only.
  */
 :root {
-  --paper: #f6f5f1;
-  --paper-deep: #ebe8e1;
+  --paper: #fbf8f3;
+  --paper-deep: #f0ebe2;
   --surface: #ffffff;
-  --ink: #0c0d0c;
-  --ink-soft: #5b5c58;
-  --line: #e4e1da;
+  --ink: #1f1e1b;
+  --ink-soft: #6b675f;
+  --line: #e6e0d5;
   --clay: #c2562b;
   --clay-dark: #9f4420;
   --pine: #0d5c63;
@@ -32,8 +32,16 @@
   --color-pine: var(--pine);
   --color-pine-soft: var(--pine-soft);
   --color-good: var(--good);
-  --font-sans: var(--font-geist), "Helvetica Neue", Arial, sans-serif;
-  --font-serif: var(--font-instrument), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-inter), "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Headlines: medium weight, tightly tracked, like lettering on a drawing set. */
+@layer components {
+  .font-display {
+    font-weight: 500;
+    letter-spacing: -0.045em;
+  }
 }
 
 body {

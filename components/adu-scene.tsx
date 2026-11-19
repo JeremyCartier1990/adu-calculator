@@ -17,8 +17,7 @@ const D = 5;
 const H = 2.7;
 const SLAB = 0.22;
 const WALL = 0.2;
-const RISE = 1.35;
-const EAVE = 0.35;
+const EAVE = 0.45;
 
 // A Venice-style beach grid: 12 m lots, alleys behind, streets in front, then the boardwalk, beach, and ocean.
 const LOT = 12;
@@ -39,6 +38,8 @@ const ALLEYS = [
   [-75, -70],
 ];
 const BOARDWALK = [-116, -109];
+// Between the existing home and the ADU.
+const LOT_MIDDLE = -8;
 const SHORE = -160;
 
 // CC0 assets from Poly Haven, served from public/3d.
@@ -142,9 +143,9 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, small ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.8;
+  renderer.toneMappingExposure = 0.92;
   const canvas = renderer.domElement;
   canvas.style.cssText = "display:block;width:100%;height:100%;opacity:0;transition:opacity 1.4s ease";
   host.appendChild(canvas);
@@ -443,10 +444,11 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
         if (!neighbor && random() > 0.45) backUnit(cx + between(-2, 2), alleyEdge + toStreet * 4.5, -toStreet);
         if (random() > 0.55) tree(cx + between(-4, 4), (houseZ + alleyEdge) / 2 + between(-2, 2), between(0.8, 1.2));
       }
-      // Property-line fences between back yards.
+      // Property-line fences between back yards; our lot's two sides get their own fences below.
       const yardFrom = houseZ - toStreet * (d / 2);
       const length = Math.abs(alleyEdge - yardFrom);
-      if (!ours && lotRow.min > -80) block(0.12, 1.6, length, pick([wood, walls[1], hedge]), cx + LOT / 2, 0, (yardFrom + alleyEdge) / 2);
+      const ourLeftLine = lotRow.min === -26 && i === -1;
+      if (!ours && !ourLeftLine && lotRow.min > -80) block(0.12, 1.6, length, pick([wood, walls[1], hedge]), cx + LOT / 2, 0, (yardFrom + alleyEdge) / 2);
     }
   }
 
@@ -564,30 +566,32 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
   const roofBase = SLAB + H;
   roof.position.y = roofBase;
   scene.add(roof);
-  const pitch = Math.atan(RISE / (D / 2));
-  const halfSpan = D / 2 + EAVE;
-  const slope = halfSpan / Math.cos(pitch);
-  for (const side of [1, -1]) {
-    const panel = new THREE.Mesh(textured(new THREE.BoxGeometry(W + EAVE * 2, 0.1, slope), roofing), roofing);
-    panel.position.set(0, RISE - (halfSpan / 2) * Math.tan(pitch) + 0.08, (side * halfSpan) / 2);
-    panel.rotation.x = side * pitch;
-    panel.castShadow = true;
-    panel.receiveShadow = true;
-    roof.add(panel);
-    // Fascia board along the eave.
-    const fascia = riser(W + EAVE * 2, 0.18, 0.05, charcoal, 0, -0.2 - (EAVE * RISE) / (D / 2), side * (halfSpan + 0.02), roof);
-    fascia.castShadow = false;
+  // A flat roof with a deep overhang and a thin dark fascia: a modern backyard unit, not a small copy of the main house.
+  riser(W + EAVE * 2, 0.22, D + EAVE * 2, roofing, 0, 0, 0, roof);
+  for (const [w, d, x, z] of [
+    [W + EAVE * 2 + 0.04, 0.04, 0, D / 2 + EAVE + 0.02],
+    [W + EAVE * 2 + 0.04, 0.04, 0, -D / 2 - EAVE - 0.02],
+    [0.04, D + EAVE * 2, W / 2 + EAVE + 0.02, 0],
+    [0.04, D + EAVE * 2, -W / 2 - EAVE - 0.02, 0],
+  ]) {
+    riser(w, 0.26, d, charcoal, x, -0.02, z, roof).castShadow = false;
   }
-  const gable = new THREE.Shape([new THREE.Vector2(-D / 2, 0), new THREE.Vector2(D / 2, 0), new THREE.Vector2(0, RISE)]);
-  const gableGeometry = textured(new THREE.ExtrudeGeometry(gable, { depth: WALL, bevelEnabled: false }), stucco);
-  for (const x of [W / 2 - WALL, -W / 2]) {
-    const end = new THREE.Mesh(gableGeometry, stucco);
-    end.rotation.y = Math.PI / 2;
-    end.position.x = x;
-    end.castShadow = true;
-    end.receiveShadow = true;
-    roof.add(end);
-  }
+
+  // The client's lot: a glowing property line around both buildings, and a paver path from the main house to the ADU.
+  const lotLine = mat(0x5fc2b8, { emissive: 0x5fc2b8, emissiveIntensity: 1.6, roughness: 0.5 });
+  const lotFront = ROWS[1].min + 1.9;
+  const lotBack = ROWS[1].max - 0.15;
+  const lotSide = LOT / 2 - 0.25;
+  const lotEdges = [
+    riser(0.24, 0.03, lotBack - lotFront, lotLine, -lotSide, 0.01, (lotFront + lotBack) / 2),
+    riser(LOT - 0.5, 0.03, 0.24, lotLine, 0, 0.01, lotBack),
+    riser(0.24, 0.03, lotBack - lotFront, lotLine, lotSide, 0.01, (lotFront + lotBack) / 2),
+    riser(LOT - 0.5, 0.03, 0.24, lotLine, 0, 0.01, lotFront),
+  ];
+  for (const edge of lotEdges) edge.castShadow = false;
+  const pavers: Mesh[] = [];
+  for (let z = -11.4; z <= D / 2 + 1.2; z += 0.95) pavers.push(riser(0.9, 0.05, 0.6, concrete, -W / 2 - 0.9, 0, z));
+  for (const paver of pavers) paver.castShadow = false;
 
   const interior = new THREE.PointLight(0xffa860, 0, 10, 2);
   interior.position.set(-1, SLAB + 1.6, D / 2 + 0.6);
@@ -600,6 +604,28 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
     place(planter, 3.8, D / 2 + 0.45),
     place(planter.clone(), W / 2 + 0.5, 1.4, Math.PI / 2),
   ];
+
+  // Labels that follow the two buildings, so it's clear the ADU shares the lot with the existing home.
+  const makeLabel = (text: string, accent: boolean) => {
+    const element = document.createElement("div");
+    element.textContent = text;
+    element.style.cssText = [
+      "position:absolute;left:0;top:0;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .6s ease",
+      "padding:6px 12px 6px 10px;border-radius:999px;font:600 12px/1 var(--font-inter),system-ui,sans-serif;letter-spacing:.01em",
+      accent ? "background:#5fc2b8;color:#0c0d0c" : "background:rgba(255,255,255,.92);color:#0c0d0c",
+      "box-shadow:0 6px 20px rgba(0,0,0,.25)",
+    ].join(";");
+    const dot = document.createElement("span");
+    dot.style.cssText = `display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:7px;vertical-align:1px;background:${accent ? "#0c0d0c" : "#5fc2b8"}`;
+    element.prepend(dot);
+    host.appendChild(element);
+    return element;
+  };
+  const labels = [
+    { element: makeLabel("Existing home", false), at: new THREE.Vector3(0, 5.7, -17.5), from: 1.5 },
+    { element: makeLabel("New ADU · same lot", true), at: new THREE.Vector3(0, SLAB + H + 1.1, 0), from: 7.6 },
+  ];
+  const projected = new THREE.Vector3();
 
   // Post-processing: ambient occlusion grounds the objects, bloom lifts the lit windows.
   const composer = new EffectComposer(renderer);
@@ -615,7 +641,8 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
   composer.addPass(new OutputPass());
 
   // Look past the ADU toward the sea, so the coastline sits in the upper part of the frame.
-  const target = new THREE.Vector3(0, 0, -10);
+  // The camera looks out past the lot, nearly level, so the headline sits in the sky and the lot fills the bottom of the frame.
+  const target = new THREE.Vector3();
   const studStagger = 2 / studs.length;
   let distance = 24;
 
@@ -652,10 +679,28 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
     ripples.offset.set(t * 0.004, t * 0.007);
 
     const approach = 1 - phase(t, 0, 8);
-    const angle = 0.5 + Math.sin(t * 0.07) * 0.35;
+    // Orbit the middle of the lot from the side, so the ADU and the existing home sit next to each other in frame.
+    const angle = 0.95 + Math.sin(t * 0.07) * 0.1;
     const radius = distance + approach * 12;
-    camera.position.set(Math.sin(angle) * radius, 12 + approach * 5, Math.cos(angle) * radius);
+    const x = Math.sin(angle);
+    const z = Math.cos(angle);
+    camera.position.set(x * radius, 14 + approach * 5, LOT_MIDDLE + z * radius);
+    target.set(-x * 30, 6, LOT_MIDDLE - z * 30);
     camera.lookAt(target);
+
+    const lineIn = phase(t, 0.3, 1.6);
+    lotEdges.forEach((edge, i) => {
+      edge.visible = lineIn > 0;
+      edge.scale.set(i % 2 ? Math.max(0.001, lineIn) : 1, 1, i % 2 ? 1 : Math.max(0.001, lineIn));
+    });
+    camera.updateMatrixWorld();
+    for (const label of labels) {
+      projected.copy(label.at).project(camera);
+      const x = ((projected.x + 1) / 2) * host.clientWidth;
+      const y = ((1 - projected.y) / 2) * host.clientHeight;
+      label.element.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+      label.element.style.opacity = t > label.from && projected.z < 1 ? "1" : "0";
+    }
   }
 
   function resize() {
@@ -667,12 +712,11 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
     composer.setSize(w, h);
     const wide = w / h > 1.1;
     camera.aspect = w / h;
-    camera.fov = wide ? 48 : 58;
-    distance = wide ? 24 : 30;
-    // Frame the ADU right of the headline on wide screens, above it on narrow ones.
-    target.set(0, 0, wide ? -10 : -1);
-    if (wide) camera.setViewOffset(w, h, -w * 0.17, 0, w, h);
-    else camera.setViewOffset(w, h, 0, h * 0.3, w, h);
+    camera.fov = wide ? 56 : 68;
+    distance = wide ? 26 : 28;
+    // On tall phone frames, shift the picture down so the lot lands below the form.
+    if (wide) camera.clearViewOffset();
+    else camera.setViewOffset(w, h, 0, -h * 0.17, w, h);
     camera.updateProjectionMatrix();
   }
 
@@ -732,6 +776,7 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
       material.dispose();
     }
     for (const map of textures) map.dispose();
+    for (const label of labels) label.element.remove();
     composer.dispose();
     renderer.dispose();
     renderer.forceContextLoss();

@@ -29,7 +29,7 @@ async function Leads() {
     <div className="mx-auto max-w-[1400px] px-4 py-10">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="font-serif text-4xl tracking-tight">Leads</h1>
+          <h1 className="font-display text-4xl">Leads</h1>
           <p className="mt-1 text-sm text-ink-soft">
             {reports.length} saved {reports.length === 1 ? "report" : "reports"}, newest first. Each row opens the homeowner&apos;s latest
             choices.

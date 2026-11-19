@@ -109,10 +109,10 @@ export function AddressInput({
             setOpen(false);
           }
         }}
-        className={`min-h-14 w-full rounded-full border px-5 text-base outline-none transition ${
+        className={`w-full border px-5 text-base outline-none transition ${
           light
-            ? "border-white/25 bg-white/95 text-ink placeholder:text-ink-soft focus:border-white focus:ring-4 focus:ring-white/25"
-            : "border-line bg-white text-ink placeholder:text-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/10"
+            ? "min-h-13 rounded-lg border-transparent bg-transparent text-ink placeholder:text-ink-soft focus:bg-paper"
+            : "min-h-14 rounded-full border-line bg-white text-ink placeholder:text-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/10"
         } ${invalid ? "border-clay" : ""}`}
       />
       {expanded ? (

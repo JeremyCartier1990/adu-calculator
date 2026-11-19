@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Instrument_Serif } from "next/font/google";
+import { Inter } from "next/font/google";
+import Script from "next/script";
 import { BRAND } from "@/lib/brand";
+import { REDTRACK_SCRIPT } from "@/lib/redtrack";
 import "./globals.css";
 
-const geist = Geist({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-geist",
-  display: "swap",
-});
-
-const instrument = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-instrument",
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -34,8 +28,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geist.variable} ${instrument.variable} h-full antialiased`}>
-      <body className="min-h-full bg-paper font-sans text-ink">{children}</body>
+    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+      <body className="min-h-full bg-paper font-sans text-ink">
+        {children}
+        <Script src={REDTRACK_SCRIPT} strategy="afterInteractive" />
+      </body>
     </html>
   );
 }

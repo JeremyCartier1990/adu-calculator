@@ -85,7 +85,7 @@ export function ResultsPanel({
     <div className="space-y-5">
       <section className="rounded-3xl border border-line bg-surface p-5 shadow-[0_18px_50px_rgba(28,25,21,0.06)] sm:p-6" aria-labelledby="estimate-heading">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-clay">Estimate</p>
-        <h3 id="estimate-heading" className="mt-2 font-serif text-3xl tracking-tight text-ink">
+        <h3 id="estimate-heading" className="mt-2 font-display text-3xl text-ink">
           {estimate.projectLabel}
         </h3>
         <p className="mt-1 text-sm text-ink-soft">
@@ -124,7 +124,7 @@ export function ResultsPanel({
       </section>
 
       <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="cost-heading">
-        <h3 id="cost-heading" className="font-serif text-2xl tracking-tight">Project cost</h3>
+        <h3 id="cost-heading" className="font-display text-2xl">Project cost</h3>
         <dl className="mt-2">
           <Row label="Construction" value={formatMoney(estimate.construction)} hint="Size × cost per square foot" />
           <Row label="Architectural plans" value={formatMoney(estimate.design)} />
@@ -145,7 +145,7 @@ export function ResultsPanel({
       </section>
 
       <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="income-heading">
-        <h3 id="income-heading" className="font-serif text-2xl tracking-tight">Rent & payback</h3>
+        <h3 id="income-heading" className="font-display text-2xl">Rent & payback</h3>
         <p className="mt-1 text-sm leading-6 text-ink-soft">
           Both figures stay on screen. Payback, the chart, and the income approach follow the one you select.
         </p>
@@ -232,7 +232,7 @@ export function ResultsPanel({
 
         <p className="mt-4 text-sm leading-6 text-ink-soft">{ORDINANCE_NOTE}</p>
 
-        <h4 className="mt-6 font-serif text-xl tracking-tight">{active.label}</h4>
+        <h4 className="mt-6 font-display text-xl">{active.label}</h4>
         <p className="mt-1 text-sm text-ink-soft">{active.sourceNote}</p>
         <dl className="mt-2">
           <Row label={active.summary} value={formatMoney(active.monthlyGross)} />
@@ -251,7 +251,7 @@ export function ResultsPanel({
       </section>
 
       <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="value-heading">
-        <h3 id="value-heading" className="font-serif text-2xl tracking-tight">Value & equity</h3>
+        <h3 id="value-heading" className="font-display text-2xl">Value & equity</h3>
         <p className="mt-1 text-sm leading-6 text-ink-soft">
           {estimate.usedFallbackValuePerSqft
             ? "Using a fallback price per square foot until the home's size and value are both filled in."
@@ -329,7 +329,7 @@ function ScenarioCard({
       />
       <span className="block text-sm font-semibold leading-5">{scenario.label}</span>
       <span className="mt-2 block text-xs uppercase tracking-wide text-ink-soft">{scenario.summary}</span>
-      <span className="mt-1 block font-serif text-2xl tabular-nums">{formatMoney(scenario.monthlyGross)}</span>
+      <span className="mt-1 block font-display text-2xl tabular-nums">{formatMoney(scenario.monthlyGross)}</span>
       <span className="mt-2 block text-sm text-ink-soft">
         Net {formatMoney(scenario.monthlyNet)} / month · {formatYears(scenario.breakEvenYears)}
       </span>

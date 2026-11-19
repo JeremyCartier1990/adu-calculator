@@ -1,8 +1,9 @@
 import { Logo } from "@/components/brand";
+import { ArrowBox } from "@/components/eyebrow";
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-20 bg-paper/85 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-line/70 bg-paper/90 backdrop-blur">
       <a className="skip-link" href="#start">
         Skip to the address form
       </a>
@@ -14,13 +15,17 @@ export function SiteHeader() {
           <a href="#how" className="hidden text-sm text-ink-soft hover:text-ink md:inline">
             How it works
           </a>
+          <a href="#designs" className="hidden text-sm text-ink-soft hover:text-ink md:inline">
+            ADU designs
+          </a>
           <a href="#report" className="hidden text-sm text-ink-soft hover:text-ink md:inline">
             The report
           </a>
           <a href="#faq" className="hidden text-sm text-ink-soft hover:text-ink md:inline">
             FAQ
           </a>
-          <a href="#start" className="inline-flex min-h-10 items-center rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/85">
+          <a href="#start" className="inline-flex min-h-10 items-center gap-2.5 rounded-lg bg-ink py-1 pl-1 pr-4 text-sm font-medium text-white hover:bg-ink/85">
+            <ArrowBox />
             Get my report
           </a>
         </nav>

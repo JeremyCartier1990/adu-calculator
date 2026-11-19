@@ -32,7 +32,7 @@ export function AdminLogin() {
         }
       }}
     >
-      <h1 className="font-serif text-3xl tracking-tight">Team sign-in</h1>
+      <h1 className="font-display text-3xl">Team sign-in</h1>
       <p className="mt-2 text-sm text-ink-soft">Leads and saved ADU reports.</p>
       <label className="mt-6 block">
         <span className="text-sm font-medium">Password</span>

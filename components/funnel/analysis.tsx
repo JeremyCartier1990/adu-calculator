@@ -66,7 +66,7 @@ export function AnalysisSection({
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-pine">Your ADU ROI report</p>
-            <h2 id="analysis-heading" className="mt-3 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">
+            <h2 id="analysis-heading" className="mt-3 font-display text-4xl leading-tight sm:text-5xl">
               {property.address}
             </h2>
             <p className="mt-2 text-sm text-ink-soft" aria-live="polite">
@@ -159,7 +159,7 @@ export function AnalysisSection({
                 <label htmlFor="adu-size" className="text-sm font-semibold">
                   Size
                 </label>
-                <span className="font-serif text-3xl tabular-nums">{analysis.sqft.toLocaleString("en-US")} sqft</span>
+                <span className="font-display text-3xl tabular-nums">{analysis.sqft.toLocaleString("en-US")} sqft</span>
               </div>
               <input
                 id="adu-size"

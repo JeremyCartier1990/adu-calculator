@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { AnalysisSection } from "@/components/funnel/analysis";
 import { AddressInput } from "@/components/funnel/address-input";
+import { ArrowBox } from "@/components/eyebrow";
 import { Hero } from "@/components/hero";
+import { trackLeadConversion } from "@/lib/redtrack";
 import { validateAddress } from "@/lib/address";
 import type { PropertyLookup } from "@/lib/api-types";
 import { BRAND } from "@/lib/brand";
@@ -114,6 +116,7 @@ export function Funnel() {
   }
 
   function openAnalysis(saved: SavedReport | null, note: string | null) {
+    if (saved) trackLeadConversion(saved.id);
     setReport(saved);
     setSaveNote(note);
     setStep("analysis");
@@ -127,7 +130,7 @@ export function Funnel() {
     <>
       <Hero>
         <form
-          className="flex flex-col gap-2 sm:flex-row"
+          className="flex flex-col gap-2 rounded-xl border border-line bg-white p-2 shadow-[0_24px_60px_rgba(31,30,27,0.14)] sm:flex-row"
           onSubmit={(event) => {
             event.preventDefault();
             void startLookup(address);
@@ -144,12 +147,13 @@ export function Funnel() {
           <button
             type="submit"
             disabled={looking}
-            className="inline-flex min-h-14 shrink-0 items-center justify-center rounded-full bg-[#9fe0d8] px-7 text-base font-semibold text-ink transition hover:bg-[#b8ebe5] disabled:cursor-wait disabled:opacity-80"
+            className="inline-flex min-h-13 shrink-0 items-center justify-center gap-3 rounded-lg bg-ink py-2 pl-2 pr-5 text-base font-medium text-white transition hover:bg-ink/85 disabled:cursor-wait disabled:opacity-80"
           >
+            <ArrowBox />
             {looking ? "Finding your home…" : "Get my ROI report"}
           </button>
         </form>
-        <p role="status" className={`mt-3 text-sm ${addressError ? "text-[#ffb59a]" : "text-white/60"}`}>
+        <p role="status" className={`mt-3 inline-block rounded-md bg-paper/85 px-2.5 py-1 text-sm backdrop-blur ${addressError ? "text-clay" : "text-ink-soft"}`}>
           {addressError ?? "Free · About 2 minutes · No obligation"}
         </p>
       </Hero>
@@ -243,7 +247,7 @@ function ConfirmStep({
       }}
     >
       <Progress at={1} />
-      <h2 className="mt-6 font-serif text-4xl leading-tight tracking-tight">Is this your property?</h2>
+      <h2 className="mt-6 font-display text-4xl leading-tight">Is this your property?</h2>
       <div className="mt-4 flex items-start justify-between gap-4 rounded-2xl bg-paper px-4 py-3">
         <p className="text-sm font-medium leading-6">{address}</p>
         <button type="button" onClick={onChangeAddress} className="shrink-0 text-sm font-medium text-pine underline-offset-4 hover:underline">
@@ -388,7 +392,7 @@ function ContactStep({
       }}
     >
       <Progress at={2} />
-      <h2 className="mt-6 font-serif text-4xl leading-tight tracking-tight">Where should we send your report?</h2>
+      <h2 className="mt-6 font-display text-4xl leading-tight">Where should we send your report?</h2>
       <p className="mt-2 text-sm leading-6 text-ink-soft">
         Your report gets a private link and a PDF. {needsCode ? "We text a code to confirm your number." : ""}
       </p>

@@ -23,7 +23,7 @@ export function formatDate(iso: string): string {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="break-inside-avoid rounded-2xl border border-line bg-surface p-5 sm:p-6">
-      <h2 className="font-serif text-2xl tracking-tight">{title}</h2>
+      <h2 className="font-display text-2xl">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -60,7 +60,7 @@ export function ReportView({ report, showContact }: { report: ReportRecord; show
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-pine">ADU ROI report</p>
-          <h1 className="mt-3 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">{property.address}</h1>
+          <h1 className="mt-3 font-display text-4xl leading-tight sm:text-5xl">{property.address}</h1>
           <p className="mt-2 text-sm text-ink-soft">
             Updated {formatDate(report.updatedAt)} · Report {report.id.slice(0, 8)}
           </p>
