@@ -10,16 +10,20 @@
     "test": "tsx --test --test-concurrency=1 lib/calculate.test.ts lib/rentcast.test.ts lib/lead.test.ts lib/rate-limit.test.ts lib/airroi.test.ts lib/verify-cookie.test.ts"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.1",
+    "@react-pdf/renderer": "^4.9.0",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.187.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.3",

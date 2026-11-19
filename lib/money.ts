@@ -18,6 +18,9 @@ export function formatMoneyCompact(value: number): string {
     style: "currency",
     currency: "USD",
     notation: "compact",
+    // Explicit minimum: Node and browsers disagree on the default for compact
+    // currency ("$0" vs "$0.0"), which broke hydration of the cash-flow chart.
+    minimumFractionDigits: 0,
     maximumFractionDigits: 1,
   }).format(value);
 }

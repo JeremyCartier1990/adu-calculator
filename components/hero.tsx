@@ -1,56 +1,44 @@
-function YardScene() {
-  return (
-    <svg viewBox="0 0 640 460" className="h-auto w-full" aria-hidden="true">
-      <rect width="640" height="460" rx="28" fill="#E7F0EA" />
-      <path d="M0 318h640v142H0z" fill="#E4D3BC" />
-      <path d="M0 300c80 28 140 10 220-8 90-20 150 8 230 6 70-2 130 18 190 22v18H0z" fill="#D7C3A6" />
-      <circle cx="92" cy="250" r="46" fill="#2F5D4A" />
-      <rect x="84" y="250" width="16" height="70" rx="4" fill="#6B4A32" />
-      <path d="M150 292 268 196l118 96v112H150z" fill="#F7F1E8" stroke="#234237" strokeWidth="3" />
-      <path d="M138 292 268 176l130 116" fill="none" stroke="#234237" strokeWidth="3" strokeLinejoin="round" />
-      <path d="M168 292h28v64h-28zM250 230h36v32h-36zM312 230h36v32h-36z" fill="#F3E2D8" stroke="#234237" strokeWidth="3" />
-      <path d="M430 250 520 184l90 66v130H430z" fill="#FFFCF8" stroke="#9A3412" strokeWidth="3" />
-      <path d="M418 250 520 168l102 82" fill="none" stroke="#9A3412" strokeWidth="3" strokeLinejoin="round" />
-      <path d="M492 292h28v48h-28zM548 214h26v22h-26z" fill="#F3E2D8" stroke="#9A3412" strokeWidth="3" />
-      <path d="M250 360h150" stroke="#C4B29A" strokeWidth="3" strokeLinecap="round" />
-      <circle cx="560" cy="118" r="28" fill="#F0C9A0" />
-    </svg>
-  );
-}
+import { AduScene } from "@/components/adu-scene";
 
-export function Hero() {
+const highlights = [
+  { value: "Build cost", label: "Construction, plans, permits, and fees for your ADU type" },
+  { value: "Rent, two ways", label: "Long-term lease and short-term rental, side by side" },
+  { value: "ROI & value", label: "Cash flow, payback, and the value it adds to your home" },
+];
+
+/** Full-bleed 3D hero. `children` is the address form that starts the funnel. */
+export function Hero({ children }: { children: React.ReactNode }) {
   return (
-    <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 md:grid-cols-[1.1fr_0.9fr] md:py-20" aria-labelledby="hero-heading">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-clay">Los Angeles ADU & remodel</p>
-        <h1 id="hero-heading" className="mt-4 max-w-xl font-serif text-4xl leading-[1.08] tracking-tight text-ink sm:text-5xl lg:text-6xl">
-          See what an ADU could earn and add to your home&apos;s value.
-        </h1>
-        <p className="mt-5 max-w-xl text-lg leading-8 text-ink-soft">
-          Home First Remodel builds garage conversions, attached suites, and backyard cottages for Los Angeles
-          homeowners. Price the project, the rent, and the equity before you call.
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <a
-            href="#calculator"
-            className="inline-flex min-h-12 items-center justify-center rounded-full bg-pine px-5 text-base font-semibold text-white hover:bg-[#1b332b]"
+    <section id="start" className="px-3 pt-3 sm:px-4" aria-labelledby="hero-heading">
+      <div className="relative isolate mx-auto flex min-h-[max(640px,min(calc(100svh_-_5rem),920px))] max-w-[1400px] flex-col justify-end overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,#7d97ad_0%,#b9b3a3_48%,#e8c39a_100%)]">
+        <AduScene />
+        <div
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(12,13,12,0.9)_0%,rgba(12,13,12,0.72)_52%,rgba(12,13,12,0)_80%)] lg:bg-[linear-gradient(to_top,rgba(12,13,12,0.82)_0%,rgba(12,13,12,0.2)_48%,rgba(12,13,12,0)_72%),linear-gradient(to_right,rgba(12,13,12,0.6)_0%,rgba(12,13,12,0)_58%)]"
+          aria-hidden="true"
+        />
+        <div className="relative z-10 px-5 pb-6 pt-40 sm:px-10 sm:pb-8 lg:px-14 lg:pb-10">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/70">Los Angeles · ADU investment analysis</p>
+          <h1
+            id="hero-heading"
+            className="mt-4 max-w-3xl font-serif text-[2.9rem] leading-[1] tracking-tight text-white sm:text-6xl lg:text-7xl xl:text-[5.5rem]"
           >
-            Run the calculator
-          </a>
-          <a
-            href="#consultation"
-            className="inline-flex min-h-12 items-center justify-center rounded-full border border-line bg-surface px-5 text-base font-semibold text-ink hover:border-pine"
-          >
-            Request a consultation
-          </a>
+            See what an ADU would <em className="italic text-[#9fe0d8]">return</em> on your property.
+          </h1>
+          <p className="mt-5 max-w-lg text-base leading-7 text-white/80 sm:text-lg">
+            Enter your address. We pull your property records, price the build, and model the rent, in a free ROI report you can
+            download.
+          </p>
+          <div className="mt-7 max-w-xl">{children}</div>
+          <dl className="mt-10 hidden gap-8 border-t border-white/15 pt-6 sm:grid sm:grid-cols-3">
+            {highlights.map((item) => (
+              <div key={item.value}>
+                <dt className="text-sm font-medium text-white">{item.value}</dt>
+                <dd className="mt-1 text-sm leading-6 text-white/60">{item.label}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
-        <ul className="mt-8 flex flex-col gap-2 text-sm text-ink-soft sm:flex-row sm:flex-wrap sm:gap-x-6">
-          <li>No account required</li>
-          <li>Address lookup is optional</li>
-          <li>Estimates, not a bid</li>
-        </ul>
       </div>
-      <YardScene />
     </section>
   );
 }

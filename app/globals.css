@@ -1,17 +1,22 @@
 @import "tailwindcss";
 
+/*
+ * ADU ROI Calculator brand tokens. Warm white, near-black ink, one Pacific
+ * accent (pine) and a sunset secondary (clay). Component classes use these
+ * names, so a palette change happens here only.
+ */
 :root {
-  --paper: #f3eee6;
-  --paper-deep: #e7dfd2;
-  --surface: #fffcf8;
-  --ink: #1c1915;
-  --ink-soft: #443f38;
-  --line: #e0d5c6;
-  --clay: #9a3412;
-  --clay-dark: #7c280e;
-  --pine: #234237;
-  --pine-soft: #e6f0ea;
-  --good: #14613d;
+  --paper: #f6f5f1;
+  --paper-deep: #ebe8e1;
+  --surface: #ffffff;
+  --ink: #0c0d0c;
+  --ink-soft: #5b5c58;
+  --line: #e4e1da;
+  --clay: #c2562b;
+  --clay-dark: #9f4420;
+  --pine: #0d5c63;
+  --pine-soft: #e3efee;
+  --good: #137a4b;
   color-scheme: light;
 }
 
@@ -27,21 +32,18 @@
   --color-pine: var(--pine);
   --color-pine-soft: var(--pine-soft);
   --color-good: var(--good);
-  --font-sans: var(--font-outfit), "Avenir Next", "Segoe UI", sans-serif;
-  --font-serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-geist), "Helvetica Neue", Arial, sans-serif;
+  --font-serif: var(--font-instrument), Georgia, "Times New Roman", serif;
 }
 
 body {
   background-color: var(--paper);
-  background-image:
-    radial-gradient(ellipse at 0% -10%, rgba(154, 52, 18, 0.08), transparent 42%),
-    radial-gradient(ellipse at 100% 0%, rgba(35, 66, 55, 0.09), transparent 38%);
   color: var(--ink);
   font-family: var(--font-sans);
 }
 
 ::selection {
-  background: #efd3c6;
+  background: #cfe3e1;
 }
 
 .skip-link {
@@ -63,7 +65,13 @@ body {
 }
 
 input[type="range"] {
-  accent-color: #234237;
+  accent-color: var(--pine);
   width: 100%;
   height: 1.75rem;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
 }

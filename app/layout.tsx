@@ -1,29 +1,40 @@
 import type { Metadata } from "next";
-import { Fraunces, Outfit } from "next/font/google";
+import { Geist, Instrument_Serif } from "next/font/google";
+import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
-const fraunces = Fraunces({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  variable: "--font-geist",
   display: "swap",
 });
 
-const outfit = Outfit({
+const instrument = Instrument_Serif({
   subsets: ["latin"],
-  variable: "--font-outfit",
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-instrument",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "ADU calculator | Home First Remodel",
+  metadataBase: new URL(BRAND.url),
+  title: `${BRAND.name} | What would an ADU return on your property?`,
   description:
-    "See what an ADU could earn and add to your home's value. Estimate construction cost, rent, payback, and equity for a Los Angeles garage conversion or ADU.",
-  applicationName: "Home First Remodel",
+    "Enter your address for a free ADU ROI report: build cost, long-term and short-term rent, cash flow, payback, and added home value for a Los Angeles ADU or garage conversion.",
+  applicationName: BRAND.name,
+  openGraph: {
+    title: `${BRAND.name} | Free ADU ROI report`,
+    description: "Build cost, rent, payback, and added value for an ADU on your lot, in about two minutes.",
+    url: BRAND.url,
+    siteName: BRAND.name,
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${outfit.variable} h-full antialiased`}>
+    <html lang="en" className={`${geist.variable} ${instrument.variable} h-full antialiased`}>
       <body className="min-h-full bg-paper font-sans text-ink">{children}</body>
     </html>
   );
