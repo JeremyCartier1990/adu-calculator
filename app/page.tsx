@@ -1,17 +1,18 @@
 import { Funnel } from "@/components/funnel/funnel";
-import { Designs, Faq, FinalCta, HowItWorks, ReportContents } from "@/components/landing";
+import { DataSources, Designs, Faq, FinalCta, HowItWorks, SampleReport } from "@/components/landing";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
 export default function HomePage() {
   return (
-    <div id="top">
+    <div id="top" className="max-md:pb-20">
       <SiteHeader />
       <main>
         <Funnel />
+        <DataSources />
+        <SampleReport />
         <HowItWorks />
         <Designs />
-        <ReportContents />
         <Faq />
         <FinalCta />
       </main>

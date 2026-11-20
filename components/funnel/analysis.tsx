@@ -13,6 +13,7 @@ import { ASSUMPTIONS, bedroomLabel, FINISH_LEVELS, PROJECT_TYPES, projectTitle }
 import { BRAND } from "@/lib/brand";
 import { BEST_SETUP_YEARS } from "@/lib/optimize";
 import { breakdownSteps, financingFor, headline, settingsUsed } from "@/lib/breakdown";
+import { formatMoney } from "@/lib/money";
 import type { ConfirmedProperty, ReportInputs } from "@/lib/report";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -40,6 +41,16 @@ export function AnalysisSection({
   const financing = financingFor(analysis.financing.inputs, estimate);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [copied, setCopied] = useState(false);
+  // Phones show the report on its own; "Edit the numbers" swaps it for every setting.
+  const [editing, setEditing] = useState(false);
+  const reportOnly = editing ? "max-lg:hidden" : "";
+  const settingsOnly = editing ? "" : "max-lg:hidden";
+  const summary = headline(estimate, financing);
+
+  function toggleEditing(next: boolean) {
+    setEditing(next);
+    requestAnimationFrame(() => document.getElementById("analysis")?.scrollIntoView({ block: "start" }));
+  }
   const savedJson = useRef<string | null>(null);
   const inputsJson = JSON.stringify({ inputs, property: facts });
 
@@ -79,13 +90,35 @@ export function AnalysisSection({
       ? "Saving your choices…"
       : saveState === "error"
         ? "Couldn't save the last change. It will retry when you change something."
-        : "Saved. Change any setting below; your report link always shows the latest."
+        : "Saved. Your report link always shows the latest."
     : (saveNote ?? "This analysis isn't saved.");
 
   return (
-    <section id="analysis" className="mx-auto max-w-[1400px] scroll-mt-4 px-3 py-10 sm:px-4 md:py-14" aria-labelledby="analysis-heading">
+    <section id="analysis" className={`mx-auto max-w-[1400px] scroll-mt-4 px-3 py-10 sm:px-4 md:py-14 ${editing ? "" : "max-lg:pb-28"}`} aria-labelledby="analysis-heading">
+      {editing ? (
+        <div className="sticky top-0 z-30 -mx-3 mb-3 border-b border-white/10 bg-ink px-4 py-3 text-white shadow-lg sm:-mx-4 lg:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">Editing · updates live</p>
+              <p className="mt-0.5 truncate text-sm tabular-nums">
+                {formatMoney(summary.invest)} → <span className="text-[#7fd6a8]">+{formatMoney(summary.valueAdded)}</span>
+              </p>
+              <p className="text-xs tabular-nums text-white/70">
+                You keep {formatMoney(summary.longTerm)} lease · {formatMoney(summary.shortTerm)} short-term
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleEditing(false)}
+              className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-white px-4 text-sm font-semibold text-ink"
+            >
+              See report
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-        <div className="flex flex-col lg:flex-row">
+        <div className={`flex flex-col lg:flex-row ${reportOnly}`}>
           <div className="flex flex-1 flex-col justify-between gap-8 p-6 sm:p-10">
             <div>
               <Eyebrow>Your ADU ROI report</Eyebrow>
@@ -101,7 +134,15 @@ export function AnalysisSection({
               </p>
             </div>
             {report && reportUrl ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => toggleEditing(true)}
+                  className="col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-ink bg-white px-5 text-sm font-semibold text-ink lg:hidden"
+                >
+                  <PencilIcon />
+                  Edit the numbers
+                </button>
                 <a
                   href={`/r/${report.id}/pdf`}
                   onClick={async (event) => {
@@ -112,7 +153,7 @@ export function AnalysisSection({
                     link.href = `/r/${report.id}/pdf`;
                     link.click();
                   }}
-                  className="inline-flex min-h-12 items-center gap-3 rounded-lg bg-ink py-2 pl-5 pr-2 text-sm font-semibold text-white hover:bg-ink/85"
+                  className="col-span-2 inline-flex min-h-12 items-center justify-between gap-3 rounded-lg bg-ink py-2 pl-5 pr-2 text-sm font-semibold text-white hover:bg-ink/85 sm:justify-start"
                 >
                   Download PDF
                   <ArrowBox />
@@ -125,7 +166,7 @@ export function AnalysisSection({
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className="inline-flex min-h-12 items-center rounded-lg border border-line bg-white px-5 text-sm font-semibold hover:border-ink"
+                  className={`inline-flex min-h-12 items-center justify-center rounded-lg border border-line bg-white px-4 text-sm font-semibold hover:border-ink sm:px-5 ${onReportPage ? "col-span-2" : ""}`}
                 >
                   {copied ? "Link copied" : "Copy report link"}
                 </button>
@@ -134,7 +175,7 @@ export function AnalysisSection({
                     href={`/r/${report.id}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex min-h-12 items-center rounded-lg border border-line bg-white px-5 text-sm font-semibold hover:border-ink"
+                    className="inline-flex min-h-12 items-center justify-center rounded-lg border border-line bg-white px-4 text-sm font-semibold hover:border-ink sm:px-5"
                   >
                     Open report
                   </a>
@@ -144,12 +185,12 @@ export function AnalysisSection({
           </div>
         </div>
 
-        <div className="bg-ink p-5 sm:p-8 lg:p-10">
-          <InvestmentSummary estimate={estimate} summary={headline(estimate, financing)} />
+        <div className={`bg-ink p-5 sm:p-8 lg:p-10 ${reportOnly}`}>
+          <InvestmentSummary estimate={estimate} summary={summary} />
           <div className="mt-5 flex flex-col gap-3 rounded-xl border border-white/15 px-4 py-3 text-sm text-white/80 sm:flex-row sm:items-center sm:justify-between">
             <p className="leading-6">
               {analysis.onBest
-                ? `This is the best setup for this property: a ${projectPhrase(estimate)}, the biggest the state allows here, with the highest ${BEST_SETUP_YEARS}-year return. Change anything below.`
+                ? `This is the best setup for this property: a ${projectPhrase(estimate)}, the biggest the state allows here, with the highest ${BEST_SETUP_YEARS}-year return. You can change anything.`
                 : `The best setup for this property is a ${analysis.best.sqft.toLocaleString("en-US")} sqft ${projectTitle(analysis.best.projectType).toLowerCase().replace("adu", "ADU")} with a standard finish.`}
             </p>
             {analysis.onBest ? null : (
@@ -165,7 +206,7 @@ export function AnalysisSection({
         </div>
 
         <div className="grid items-start gap-8 p-4 sm:p-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-10 lg:p-10">
-          <div className="min-w-0 space-y-8">
+          <div className={`min-w-0 space-y-8 ${reportOnly}`}>
             <CalculationBreakdown
               steps={breakdownSteps(estimate, financing)}
               settings={settingsUsed(estimate, financing, { homeValue: analysis.facts.homeValue, squareFootage: analysis.facts.squareFootage, lotSize: analysis.facts.lotSize })}
@@ -181,7 +222,7 @@ export function AnalysisSection({
             />
           </div>
 
-          <div className="rounded-xl border border-line bg-paper p-5 sm:p-6">
+          <div className={`rounded-xl border border-line bg-paper p-5 sm:p-6 ${settingsOnly}`}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line pb-4">
               <h3 className="whitespace-nowrap font-display text-2xl text-ink">Change the numbers</h3>
               <span className="text-xs text-ink-soft">{report ? "Changes save automatically" : "Try any option"}</span>
@@ -253,7 +294,11 @@ export function AnalysisSection({
               {analysis.projectType !== "garage_conversion" ? (
                 <button
                   type="button"
-                  onClick={requestLotDrawing}
+                  onClick={() => {
+                    // The map belongs to the report view on phones, so leave edit mode first.
+                    setEditing(false);
+                    requestAnimationFrame(requestLotDrawing);
+                  }}
                   className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-semibold text-ink transition hover:border-ink"
                 >
                   <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -412,9 +457,23 @@ export function AnalysisSection({
           </div>
         </div>
 
-        <FinancingSection state={analysis.financing} estimate={estimate} />
+        <div className={settingsOnly}>
+          <FinancingSection state={analysis.financing} estimate={estimate} />
+        </div>
 
-        <div className="border-t border-line p-4 sm:p-8 lg:px-10">
+        {editing ? (
+          <div className="p-4 sm:p-8 lg:hidden">
+            <button
+              type="button"
+              onClick={() => toggleEditing(false)}
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-ink px-5 text-sm font-semibold text-white"
+            >
+              Done, see the report
+            </button>
+          </div>
+        ) : null}
+
+        <div className={`border-t border-line p-4 sm:p-8 lg:px-10 ${reportOnly}`}>
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <h3 className="font-display text-2xl text-ink">Place the ADU on your lot</h3>
             <p className="text-sm text-ink-soft">Satellite view · drawn sizes are approximate</p>
@@ -432,7 +491,26 @@ export function AnalysisSection({
         </div>
 
       </div>
+
+      {editing ? null : (
+        <button
+          type="button"
+          onClick={() => toggleEditing(true)}
+          className="fixed inset-x-4 bottom-4 z-30 inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-white shadow-lg ring-1 ring-white/25 lg:hidden"
+        >
+          <PencilIcon />
+          Edit the numbers
+        </button>
+      )}
     </section>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10.5 2.5l3 3L5 14H2v-3z" />
+    </svg>
   );
 }
 

@@ -117,7 +117,7 @@ export function FinancingSection({ state, estimate }: { state: FinancingState; e
                   <p className="mt-1 text-xs leading-5 text-ink-soft">
                     Freddie Mac average, week of {weekLabel(state.market.asOf)}: {percentLabel(state.market.rate)}%.{" "}
                     {state.inputs.refiRate !== state.market.rate ? (
-                      <button type="button" onClick={state.useMarketRate} className="font-semibold text-pine hover:underline">
+                      <button type="button" onClick={state.useMarketRate} className="-my-2 inline-flex min-h-10 items-center px-1 font-semibold text-pine hover:underline">
                         Use it
                       </button>
                     ) : null}

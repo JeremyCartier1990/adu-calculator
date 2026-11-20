@@ -13,13 +13,13 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND.url),
-  title: `${BRAND.name} | What would an ADU return on your property?`,
+  title: `${BRAND.name} | What would an ADU add to your home?`,
   description:
-    "Enter your address for a free ADU ROI report: build cost, long-term and short-term rent, cash flow, payback, and added home value for a Los Angeles ADU or garage conversion.",
+    "Enter your address for a free ADU ROI report: what an ADU or garage conversion costs, how much value it adds, and what it rents for after the loan payments.",
   applicationName: BRAND.name,
   openGraph: {
     title: `${BRAND.name} | Free ADU ROI report`,
-    description: "Build cost, rent, payback, and added value for an ADU on your lot, in about two minutes.",
+    description: "What an ADU costs, what it adds to your home, and what it rents for after the loan, in about a minute.",
     url: BRAND.url,
     siteName: BRAND.name,
     type: "website",

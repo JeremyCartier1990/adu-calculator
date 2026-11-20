@@ -12,21 +12,18 @@ export function SiteHeader() {
           <Logo />
         </a>
         <nav aria-label="Page" className="flex items-center gap-6">
+          <a href="#report" className="hidden text-sm text-ink-soft hover:text-ink md:inline">
+            What you get
+          </a>
           <a href="#how" className="hidden text-sm text-ink-soft hover:text-ink md:inline">
             How it works
-          </a>
-          <a href="#designs" className="hidden text-sm text-ink-soft hover:text-ink md:inline">
-            ADU designs
-          </a>
-          <a href="#report" className="hidden text-sm text-ink-soft hover:text-ink md:inline">
-            The report
           </a>
           <a href="#faq" className="hidden text-sm text-ink-soft hover:text-ink md:inline">
             FAQ
           </a>
           <a href="#start" className="inline-flex min-h-10 items-center gap-2.5 rounded-lg bg-ink py-1 pl-1 pr-4 text-sm font-medium text-white hover:bg-ink/85">
             <ArrowBox />
-            Get my report
+            Free report
           </a>
         </nav>
       </div>

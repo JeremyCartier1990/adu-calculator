@@ -19,12 +19,12 @@ export function CalculationBreakdown({ steps, settings, notes }: { steps: Breakd
       <ol className="mt-5 space-y-3">
         {steps.map((step) => (
           <li key={step.n} className="break-inside-avoid rounded-xl border border-line bg-white p-4 sm:p-5">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
               <h4 className="flex items-center gap-2.5 text-base font-semibold text-ink">
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink text-xs font-semibold text-white">{step.n}</span>
                 {step.title}
               </h4>
-              <p className="font-display text-xl tabular-nums text-ink">{step.result}</p>
+              <p className="pl-8 font-display text-xl tabular-nums text-ink sm:pl-0">{step.result}</p>
             </div>
             <dl className="mt-3 text-sm">
               {step.lines.map((line, index) => (

@@ -1,76 +1,168 @@
 import Image, { type StaticImageData } from "next/image";
 import { ArrowBox, Eyebrow } from "@/components/eyebrow";
+import { InvestmentSummary } from "@/components/report/investment-summary";
 import { BRAND } from "@/lib/brand";
+import { SAMPLE_PROPERTY, sampleReport } from "@/lib/sample-report";
 import blackCabin from "@/public/adus/black-cabin.jpg";
 import cedarDeck from "@/public/adus/cedar-deck.jpg";
 import oakCottage from "@/public/adus/oak-cottage.jpg";
 import stuccoFlatRoof from "@/public/adus/stucco-flat-roof.jpg";
 import whiteModern from "@/public/adus/white-modern.jpg";
 
+/** Every primary call to action on the page goes back to the address field. */
+function StartButton({ children, tone = "dark" }: { children: React.ReactNode; tone?: "dark" | "light" }) {
+  const dark = tone === "dark";
+  return (
+    <a
+      href="#start"
+      className={`inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-lg py-1.5 pl-1.5 pr-5 text-base font-semibold sm:w-auto ${
+        dark ? "bg-ink text-white hover:bg-ink/85" : "bg-white text-ink hover:bg-paper"
+      }`}
+    >
+      <ArrowBox tone={dark ? "dark" : "light"} />
+      {children}
+    </a>
+  );
+}
+
+const SOURCES = [
+  { title: "Property records", text: "Home size, lot, beds, baths, and value for your address" },
+  { title: "Rent comps", text: "Long-term rent for an ADU near you, from RentCast" },
+  { title: "Short-term data", text: "Nightly rates and occupancy nearby, from AirROI" },
+  { title: "Mortgage rates", text: "This week's Freddie Mac average, to price a refinance" },
+  { title: "California ADU rules", text: "The largest unit the state lets you build on your lot" },
+];
+
+/** Under the hero: where the numbers come from, so the report reads as data, not a sales pitch. */
+export function DataSources() {
+  return (
+    <section className="mx-auto max-w-[1400px] px-4 pt-10 sm:px-6 md:pt-14" aria-labelledby="sources-heading">
+      <h2 id="sources-heading" className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-ink-soft">
+        Built from real data on your address
+      </h2>
+      <ul className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {SOURCES.map((source, index) => (
+          <li
+            key={source.title}
+            className={`rounded-xl border border-line bg-surface p-4 ${index === SOURCES.length - 1 ? "col-span-2 sm:col-span-1" : ""}`}
+          >
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <Check />
+              {source.title}
+            </p>
+            <p className="mt-1.5 text-sm leading-5 text-ink-soft">{source.text}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function Check({ className = "text-pine" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={`h-4 w-4 shrink-0 ${className}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 8.5l3 3 6-7" />
+    </svg>
+  );
+}
+
+const INSIDE = [
+  { title: "The best setup for your lot", text: "The ADU type and size with the best 10-year return, within California's size limits." },
+  { title: "What it costs, line by line", text: "Construction, architectural plans, and city permits at current rates for your finish." },
+  { title: "What it adds to your home", text: "Your home's value before and after, and how much more it's worth than it costs." },
+  { title: "Rent: lease vs. short-term", text: "Monthly rent, nightly rate, occupancy, and what each leaves you after expenses." },
+  { title: "How to pay for it", text: "Cash, a cash-out refinance, a loan, or a mix, and what you keep after every payment." },
+  { title: "15-year cash flow and payback", text: "Year-by-year income with rent growth, cash-on-cash return, and the year it pays for itself." },
+];
+
+/** The report's own answer for a sample home, then what else is inside. */
+export function SampleReport() {
+  const { estimate, summary } = sampleReport();
+  return (
+    <section id="report" className="scroll-mt-20 px-3 pt-16 sm:px-4 md:pt-24" aria-labelledby="report-heading">
+      <div className="mx-auto max-w-[1400px]">
+        <div className="px-1 sm:px-2">
+          <Eyebrow>What you get</Eyebrow>
+          <h2 id="report-heading" className="mt-5 max-w-3xl font-display text-4xl leading-[1.05] sm:text-5xl">
+            The answer first. <span className="text-ink-soft">Then every number behind it.</span>
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-ink-soft">
+            This is the top of a real report, run on a sample home. Yours uses your address, your home&apos;s records, and rent near you.
+          </p>
+        </div>
+
+        <div className="mt-8 overflow-hidden rounded-2xl bg-ink">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-5 py-3 sm:px-8">
+            <p className="text-xs text-white/60">{SAMPLE_PROPERTY.label}</p>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">Sample report</span>
+          </div>
+          <div className="p-5 sm:p-8 lg:p-10">
+            <InvestmentSummary estimate={estimate} summary={summary} />
+          </div>
+        </div>
+
+        <div className="mt-10 grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-14">
+          <div className="px-1 sm:px-2">
+            <h3 className="font-display text-3xl leading-tight">Also in your report</h3>
+            <p className="mt-3 max-w-md text-base leading-7 text-ink-soft">
+              Change any number and the whole report updates. Download it as a PDF to share with your family, your lender, or a builder.
+            </p>
+            <div className="mt-6 hidden lg:block">
+              <StartButton>Get this for my address</StartButton>
+            </div>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {INSIDE.map((item, index) => (
+              <li key={item.title} className="rounded-xl border border-line bg-surface p-5">
+                <span className="text-xs font-semibold tabular-nums text-ink-soft">0{index + 1}</span>
+                <h4 className="mt-2 text-base font-semibold text-ink">{item.title}</h4>
+                <p className="mt-1.5 text-sm leading-6 text-ink-soft">{item.text}</p>
+              </li>
+            ))}
+            <li className="rounded-xl border border-line bg-surface p-5 sm:col-span-2">
+              <h4 className="flex items-center gap-2 text-base font-semibold text-ink">
+                <Check />
+                Plus: a satellite site plan and a downloadable PDF
+              </h4>
+              <p className="mt-1.5 text-sm leading-6 text-ink-soft">
+                Draw the ADU on your own lot from above, and keep a private link that always shows your latest numbers.
+              </p>
+            </li>
+          </ul>
+          <div className="lg:hidden">
+            <StartButton>Get this for my address</StartButton>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 const STEPS = [
-  { title: "Enter your address", text: "We pull public records for the home: size, lot, bedrooms, and an estimated value." },
-  { title: "Confirm the details", text: "Correct anything that's off. Better inputs, better numbers." },
-  { title: "Get your ROI report", text: "Pick an ADU type and size. Your report updates live, and you can download it as a PDF." },
-];
-
-const METRICS = [
-  {
-    title: "All-in build cost",
-    text: "Every line from plans to final inspection, priced at current Los Angeles rates for your ADU type and finish.",
-    tags: ["Construction", "Architectural plans", "City permits"],
-  },
-  {
-    title: "Rent from real comps",
-    text: "Long-term rent from nearby rental comps for an ADU of your size, and short-term nightly rates for your market.",
-    tags: ["Long-term lease", "Short-term rental", "Occupancy", "Operating costs"],
-  },
-  {
-    title: "Return & payback",
-    text: "Year-one net income, cash-on-cash return, and a 15-year cumulative cash-flow curve with rent growth.",
-    tags: ["Net income / month", "Cash-on-cash", "Payback", "15-year cash flow"],
-  },
-  {
-    title: "Added home value",
-    text: "What the new square footage and its income may add to your home's value, against what it costs to build.",
-    tags: ["Value added", "New home value", "Equity created"],
-  },
-];
-
-const FAQ = [
-  {
-    q: "Is it free?",
-    a: "Yes. The report is free and there's no obligation to build.",
-  },
-  {
-    q: "How accurate is it?",
-    a: "It's a planning estimate, not a bid. Build costs come from current Los Angeles rates by ADU type and finish; rent comes from comps when the address matches public records. A site visit and plans set the real price.",
-  },
-  {
-    q: "Why do you ask for my phone number?",
-    a: "We text a one-time code so each report belongs to a real homeowner. A builder may follow up about your project; you can say no anytime.",
-  },
-  {
-    q: "Can I short-term rent an ADU in Los Angeles?",
-    a: "Often not without limits. LA's home-sharing ordinance restricts registration, primary-residence use, and nights. The report shows both scenarios so you can compare; check the rules for your address.",
-  },
+  { title: "Enter your address", text: "We look up your home's public records: size, lot, bedrooms, and estimated value." },
+  { title: "Check your home's details", text: "One tap if they look right. Fix anything that's off; better inputs, better numbers." },
+  { title: "Open your report", text: "Confirm your phone with a quick text code and your report opens right away, with a PDF to keep." },
 ];
 
 export function HowItWorks() {
   return (
-    <section id="how" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 py-20 sm:px-6 md:py-28" aria-labelledby="how-heading">
+    <section id="how" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 py-16 sm:px-6 md:py-24" aria-labelledby="how-heading">
       <Eyebrow>How it works</Eyebrow>
       <h2 id="how-heading" className="mt-5 max-w-3xl font-display text-4xl leading-[1.05] sm:text-5xl">
-        Three steps. <span className="text-ink-soft">Two minutes.</span>
+        Three steps. <span className="text-ink-soft">About a minute.</span>
       </h2>
-      <ol className="mt-12 grid border-t border-line sm:grid-cols-3">
+      <ol className="mt-10 grid border-t border-line sm:grid-cols-3">
         {STEPS.map((step, index) => (
-          <li key={step.title} className="border-b border-line py-8 sm:border-b-0 sm:pr-8 sm:[&:not(:first-child)]:border-l sm:[&:not(:first-child)]:pl-8">
-            <span className="text-sm font-medium tabular-nums text-ink-soft">0{index + 1}</span>
-            <h3 className="mt-10 font-display text-2xl">{step.title}</h3>
-            <p className="mt-3 max-w-sm text-sm leading-6 text-ink-soft">{step.text}</p>
+          <li key={step.title} className="border-b border-line py-7 sm:border-b-0 sm:pr-8 sm:[&:not(:first-child)]:border-l sm:[&:not(:first-child)]:pl-8">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-sm font-semibold tabular-nums text-white">{index + 1}</span>
+            <h3 className="mt-5 font-display text-2xl sm:mt-8">{step.title}</h3>
+            <p className="mt-2 max-w-sm text-base leading-7 text-ink-soft">{step.text}</p>
           </li>
         ))}
       </ol>
+      <div className="mt-8">
+        <StartButton>Start with my address</StartButton>
+      </div>
     </section>
   );
 }
@@ -120,13 +212,14 @@ export function Designs() {
     <section id="designs" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 pb-20 sm:px-6 md:pb-28" aria-labelledby="designs-heading">
       <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div>
-          <Eyebrow>ADU designs</Eyebrow>
+          <Eyebrow>Garage, attached, or backyard</Eyebrow>
           <h2 id="designs-heading" className="mt-5 max-w-2xl font-display text-4xl leading-[1.05] sm:text-5xl">
-            Built for California backyards
+            Not sure which ADU? The report compares them.
           </h2>
         </div>
-        <p className="max-w-sm text-sm leading-6 text-ink-soft">
-          Detached units, studios, and garden cottages. Pick a type in your report to see what it costs and what it earns.
+        <p className="max-w-sm text-base leading-7 text-ink-soft">
+          It opens on the setup with the best return for your lot. Switch to a garage conversion, an attached unit, or a different size
+          and every number updates.
         </p>
       </div>
       <div className="mt-12 grid gap-3 lg:grid-cols-2">
@@ -163,44 +256,37 @@ function DesignCard({ design, large = false }: { design: (typeof DESIGNS)[number
   );
 }
 
-export function ReportContents() {
-  return (
-    <section id="report" className="scroll-mt-20 px-3 sm:px-4" aria-labelledby="report-heading">
-      <div className="mx-auto max-w-[1400px] rounded-2xl bg-ink px-5 py-20 text-white sm:px-10 md:py-28 lg:px-14">
-        <Eyebrow tone="dark">What&apos;s in your report</Eyebrow>
-        <h2 id="report-heading" className="mt-5 max-w-3xl font-display text-4xl leading-[1.05] sm:text-5xl">
-          Every number you need before you call a builder
-        </h2>
-        <ul className="mt-14 border-t border-white/15">
-          {METRICS.map((metric) => (
-            <li key={metric.title} className="grid gap-5 border-b border-white/15 py-9 lg:grid-cols-[1fr_1.4fr] lg:gap-12">
-              <h3 className="font-display text-2xl">{metric.title}</h3>
-              <div>
-                <p className="max-w-xl text-base leading-7 text-white/70">{metric.text}</p>
-                <ul className="mt-5 flex flex-wrap gap-2" aria-label={`${metric.title} includes`}>
-                  {metric.tags.map((tag) => (
-                    <li key={tag} className="rounded-md bg-white/10 px-3 py-1.5 text-sm text-white/90">
-                      {tag}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <a href="#start" className="mt-12 inline-flex items-center gap-3 rounded-lg bg-white py-1.5 pl-1.5 pr-5 text-base font-medium text-ink hover:bg-paper">
-          <ArrowBox tone="light" />
-          Start with your address
-        </a>
-      </div>
-    </section>
-  );
-}
+const FAQ = [
+  {
+    q: "Is it really free?",
+    a: "Yes. The report and the PDF are free, there's nothing to buy, and there's no obligation to build.",
+  },
+  {
+    q: "What do I need to get started?",
+    a: "Just your address. We fill in your home's details from public records; you only check them.",
+  },
+  {
+    q: "Why do you ask for my phone number?",
+    a: `We text a one-time code so each report belongs to a real homeowner. ${BRAND.builder}, the builder behind the reports, may call to talk about your project; you can say no anytime.`,
+  },
+  {
+    q: "How accurate is it?",
+    a: "It's a planning estimate, not a bid. Build costs use current California rates by ADU type and finish, rent comes from comparable rentals near your address, and the value added follows how appraisers price square footage and rental income. A site visit and plans set the real price.",
+  },
+  {
+    q: "Does it work for a garage conversion?",
+    a: "Yes. Switch the ADU type to a garage conversion in your report, usually the lowest-cost option because the shell is already there, and compare it with an attached or backyard unit.",
+  },
+  {
+    q: "Can I rent it short-term?",
+    a: "It depends on your city. Many, including Los Angeles, limit short-term rentals of ADUs. The report shows both a 12-month lease and a short-term rental so you can compare; check the rules for your address.",
+  },
+];
 
 export function Faq() {
   return (
-    <section id="faq" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 py-20 sm:px-6 md:py-28" aria-labelledby="faq-heading">
-      <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr]">
+    <section id="faq" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 py-16 sm:px-6 md:py-24" aria-labelledby="faq-heading">
+      <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-10">
         <div>
           <Eyebrow>FAQ</Eyebrow>
           <h2 id="faq-heading" className="mt-5 font-display text-4xl leading-[1.05] sm:text-5xl">
@@ -209,8 +295,8 @@ export function Faq() {
         </div>
         <div className="divide-y divide-line border-y border-line">
           {FAQ.map((item) => (
-            <details key={item.q} className="group py-6">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-lg font-medium tracking-tight">
+            <details key={item.q} className="group py-5">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-6 text-lg font-medium tracking-tight">
                 {item.q}
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink/[0.06] text-lg text-ink transition group-open:rotate-45" aria-hidden="true">
                   +
@@ -228,15 +314,22 @@ export function Faq() {
 export function FinalCta() {
   return (
     <section className="px-3 sm:px-4" aria-labelledby="cta-heading">
-      <div className="mx-auto flex max-w-[1400px] flex-col items-center rounded-2xl bg-ink px-6 py-20 text-center text-white sm:py-28">
-        <Eyebrow tone="dark">Free · About 2 minutes</Eyebrow>
+      <div className="mx-auto flex max-w-[1400px] flex-col items-center rounded-2xl bg-ink px-6 py-16 text-center text-white sm:py-24">
+        <Eyebrow tone="dark">Free · About a minute · No obligation</Eyebrow>
         <h2 id="cta-heading" className="mx-auto mt-6 max-w-3xl font-display text-4xl leading-[1.05] sm:text-6xl">
-          Know your ADU&apos;s return before you build
+          Know what an ADU is worth to you before you spend a dollar
         </h2>
-        <a href="#start" className="mt-10 inline-flex items-center gap-3 rounded-lg bg-white py-1.5 pl-1.5 pr-6 text-base font-medium text-ink hover:bg-paper">
-          <ArrowBox tone="light" />
-          Get my free ROI report
-        </a>
+        <ul className="mt-6 flex flex-col gap-2 text-left text-base text-white/80 sm:flex-row sm:gap-6">
+          {["Cost to build", "Value it adds", "Rent after the loan"].map((item) => (
+            <li key={item} className="flex items-center gap-2">
+              <Check className="text-[#7fd6a8]" />
+              {item}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-9 w-full sm:w-auto">
+          <StartButton tone="light">Get my free report</StartButton>
+        </div>
       </div>
     </section>
   );

@@ -9,8 +9,11 @@ import { trackLeadConversion } from "@/lib/redtrack";
 import { rememberEditKey } from "@/lib/report-keys";
 import { validateAddress } from "@/lib/address";
 import type { PropertyLookup } from "@/lib/api-types";
+import { bedroomsForSqft, projectTitle } from "@/lib/assumptions";
 import { BRAND } from "@/lib/brand";
-import { parsePositive } from "@/lib/money";
+import { calculateEstimate, fallbackMonthlyRent } from "@/lib/calculate";
+import { formatMoney, formatNumber, parsePositive } from "@/lib/money";
+import { bestSetup } from "@/lib/optimize";
 import type { ConfirmedProperty } from "@/lib/report";
 import { EMPTY_FACTS, FACT_FIELDS, formatUsPhone, postJson, UsFlag, type FactKey, type Facts, type SavedReport } from "./shared";
 
@@ -107,10 +110,35 @@ export function Funnel() {
     if (step === "analysis") document.getElementById("analysis")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [step]);
 
+  // Every "Get my report" link on the page lands in the address field, ready to type.
+  useEffect(() => {
+    function onClick(event: MouseEvent) {
+      const link = (event.target as Element | null)?.closest?.('a[href="#start"]');
+      if (!link) return;
+      event.preventDefault();
+      document.getElementById("start")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      addressRef.current?.focus({ preventScroll: true });
+    }
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+
+  // Phones: once the address form scrolls away, a bar at the bottom brings it back.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [formVisible, setFormVisible] = useState(true);
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const observer = new IntersectionObserver(([entry]) => setFormVisible(entry.isIntersecting));
+    observer.observe(form);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <>
       <Hero>
         <form
+          ref={formRef}
           className="flex flex-col gap-2 rounded-xl border border-line bg-white p-2 shadow-[0_24px_60px_rgba(31,30,27,0.14)] sm:flex-row"
           onSubmit={(event) => {
             event.preventDefault();
@@ -131,12 +159,25 @@ export function Funnel() {
             className="inline-flex min-h-13 shrink-0 items-center justify-center gap-3 rounded-lg bg-ink py-2 pl-2 pr-5 text-base font-medium text-white transition hover:bg-ink/85 disabled:cursor-wait disabled:opacity-80"
           >
             <ArrowBox />
-            {looking ? "Finding your home…" : "Get my ROI report"}
+            {looking ? "Finding your home…" : "Get my free report"}
           </button>
         </form>
-        <p role="status" className={`mt-3 inline-block rounded-md bg-paper/85 px-2.5 py-1 text-sm backdrop-blur ${addressError ? "text-clay" : "text-ink-soft"}`}>
-          {addressError ?? "Free · About 2 minutes · No obligation"}
-        </p>
+        {addressError ? (
+          <p role="status" className="mt-3 inline-block rounded-md bg-paper/90 px-2.5 py-1 text-sm text-clay backdrop-blur">
+            {addressError}
+          </p>
+        ) : (
+          <ul className="mt-3 inline-flex flex-wrap justify-center gap-x-4 gap-y-1 rounded-md bg-paper/85 px-3 py-1.5 text-sm text-ink-soft backdrop-blur">
+            {["100% free", "About a minute", "No obligation"].map((item) => (
+              <li key={item} className="flex items-center gap-1.5">
+                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-pine" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3.5 8.5l3 3 6-7" />
+                </svg>
+                {item}
+              </li>
+            ))}
+          </ul>
+        )}
       </Hero>
 
       <StepDialog open={step === "confirm"} onClose={() => setStep("address")} label="Confirm your property">
@@ -162,6 +203,18 @@ export function Funnel() {
       </StepDialog>
 
       {step === "analysis" && property ? <AnalysisSection property={property} report={report} saveNote={saveNote} /> : null}
+
+      {step === "address" && !formVisible ? (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">
+          <a
+            href="#start"
+            className="flex min-h-12 w-full items-center justify-center gap-3 rounded-lg bg-ink py-1.5 pl-1.5 pr-5 text-base font-semibold text-white"
+          >
+            <ArrowBox />
+            Get my free report
+          </a>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -219,49 +272,142 @@ function ConfirmStep({
   onChangeAddress: () => void;
   onConfirm: () => void;
 }) {
+  // Records found: show them as a summary, one tap to accept. Nothing found: the fields, all optional.
+  const [editing, setEditing] = useState(!fromRecords);
+  const known = FACT_FIELDS.filter((field) => facts[field.key].trim() !== "");
+  const best = bestSetup({
+    homeSquareFootage: parsePositive(facts.squareFootage),
+    homeValue: parsePositive(facts.homeValue),
+    lotSize: parsePositive(facts.lotSize),
+  });
   return (
     <form
-      className="p-6 sm:p-8"
+      className="p-5 sm:p-8"
       onSubmit={(event) => {
         event.preventDefault();
         onConfirm();
       }}
     >
       <Progress at={1} />
-      <h2 className="mt-6 font-display text-4xl leading-tight">Is this your property?</h2>
+      <h2 className="mt-5 font-display text-3xl leading-tight sm:text-4xl">{fromRecords ? "We found your home" : "Tell us about your home"}</h2>
       <div className="mt-4 flex items-start justify-between gap-4 rounded-2xl bg-paper px-4 py-3">
         <p className="text-sm font-medium leading-6">{address}</p>
-        <button type="button" onClick={onChangeAddress} className="shrink-0 text-sm font-medium text-pine underline-offset-4 hover:underline">
+        <button type="button" onClick={onChangeAddress} className="-my-2 min-h-10 shrink-0 text-sm font-medium text-pine underline-offset-4 hover:underline">
           Change
         </button>
       </div>
-      <p className="mt-4 text-sm leading-6 text-ink-soft">
-        {note ?? (fromRecords ? "From public records. Correct anything that's off; we size and value your ADU from these." : "")}
+
+      {editing ? (
+        <>
+          <p className="mt-4 text-sm leading-6 text-ink-soft">
+            {note ?? "Correct anything that's off; we size and value your ADU from these."} {fromRecords ? "" : "Every field is optional."}
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {FACT_FIELDS.map((field) => (
+              <label key={field.key} className={field.key === "homeValue" ? "col-span-2" : ""}>
+                <span className="text-xs font-medium uppercase tracking-wide text-ink-soft">{field.label}</span>
+                <span className="mt-1 flex min-h-12 items-center rounded-xl border border-line bg-white focus-within:border-ink focus-within:ring-4 focus-within:ring-ink/10">
+                  {field.prefix ? <span className="pl-3 text-ink-soft">{field.prefix}</span> : null}
+                  <input
+                    inputMode="decimal"
+                    value={facts[field.key]}
+                    onChange={(event) => onFact(field.key, event.target.value)}
+                    className="min-h-12 w-full min-w-0 bg-transparent px-3 text-base tabular-nums outline-none"
+                  />
+                  {field.suffix ? <span className="pr-3 text-sm text-ink-soft">{field.suffix}</span> : null}
+                </span>
+              </label>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-line bg-white p-4 sm:grid-cols-3">
+            {known.map((field) => (
+              <div key={field.key} className={field.key === "homeValue" ? "col-span-2 sm:col-span-1" : ""}>
+                <dt className="text-xs text-ink-soft">{field.label}</dt>
+                <dd className="mt-0.5 text-base font-semibold tabular-nums">
+                  {field.prefix}
+                  {field.key === "yearBuilt" ? facts[field.key] : formatNumber(parsePositive(facts[field.key]) ?? 0)}
+                  {field.suffix ? <span className="text-sm font-normal text-ink-soft"> {field.suffix}</span> : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <button type="button" onClick={() => setEditing(true)} className="mt-2 min-h-10 text-sm font-medium text-pine underline-offset-4 hover:underline">
+            Something&apos;s off? Edit the details
+          </button>
+        </>
+      )}
+
+      <p className="mt-4 flex items-start gap-2.5 rounded-2xl bg-pine/10 px-4 py-3 text-sm leading-6 text-ink">
+        <Sparkle />
+        <span>
+          Best fit for this lot: a <strong className="font-semibold">{formatNumber(best.sqft)} sqft {projectTitle(best.projectType).toLowerCase().replace("adu", "ADU")}</strong>. Your report
+          opens on it, and you can change anything.
+        </span>
       </p>
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        {FACT_FIELDS.map((field) => (
-          <label key={field.key} className={field.key === "homeValue" ? "col-span-2" : ""}>
-            <span className="text-xs font-medium uppercase tracking-wide text-ink-soft">{field.label}</span>
-            <span className="mt-1 flex min-h-12 items-center rounded-xl border border-line bg-white focus-within:border-ink focus-within:ring-4 focus-within:ring-ink/10">
-              {field.prefix ? <span className="pl-3 text-ink-soft">{field.prefix}</span> : null}
-              <input
-                inputMode="decimal"
-                value={facts[field.key]}
-                onChange={(event) => onFact(field.key, event.target.value)}
-                className="min-h-12 w-full bg-transparent px-3 text-base tabular-nums outline-none"
-              />
-              {field.suffix ? <span className="pr-3 text-sm text-ink-soft">{field.suffix}</span> : null}
-            </span>
-          </label>
-        ))}
-      </div>
+
       <button
         type="submit"
-        className="mt-7 inline-flex min-h-13 w-full items-center justify-center rounded-full bg-ink px-6 py-3.5 text-base font-semibold text-white hover:bg-ink/85"
+        autoFocus
+        className="mt-6 inline-flex min-h-13 w-full items-center justify-center rounded-full bg-ink px-6 py-3.5 text-base font-semibold text-white hover:bg-ink/85"
       >
-        Yes, this is my property
+        {fromRecords && !editing ? "Looks right, continue" : "Continue"}
       </button>
     </form>
+  );
+}
+
+function Sparkle() {
+  return (
+    <svg viewBox="0 0 16 16" className="mt-1 h-4 w-4 shrink-0 text-pine" fill="currentColor" aria-hidden="true">
+      <path d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z" />
+    </svg>
+  );
+}
+
+/** What the report will say, from planning rents, shown blurred until the phone is confirmed. */
+function ReportTeaser({ property }: { property: ConfirmedProperty }) {
+  const size = { homeSquareFootage: property.squareFootage, homeValue: property.homeValue, lotSize: property.lotSize };
+  const setup = bestSetup(size);
+  const estimate = calculateEstimate({
+    ...setup,
+    monthlyRent: fallbackMonthlyRent(setup.sqft, bedroomsForSqft(setup.sqft)),
+    rentLow: null,
+    rentHigh: null,
+    rentSource: "assumption",
+    ...size,
+    rentalUse: "long_term",
+  });
+  const rows: Array<[string, string]> = [
+    ["Cost to build", formatMoney(estimate.total)],
+    ["Value it adds", `+${formatMoney(estimate.blendedUplift)}`],
+    ["Monthly rent", formatMoney(estimate.scenarios.longTerm.monthlyGross)],
+  ];
+  return (
+    <div className="mt-4 rounded-2xl bg-ink p-4 text-white">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">
+        Your report · {formatNumber(setup.sqft)} sqft {projectTitle(setup.projectType).toLowerCase().replace("adu", "ADU")}
+      </p>
+      <dl className="mt-3 grid grid-cols-3 gap-2">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-xs leading-4 text-white/65">{label}</dt>
+            <dd className="mt-1 select-none font-display text-lg tabular-nums blur-[6px]" aria-hidden="true">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 flex items-center gap-2 text-xs text-white/70">
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <rect x="3" y="7" width="10" height="7" rx="1.5" />
+          <path d="M5.5 7V5a2.5 2.5 0 015 0v2" />
+        </svg>
+        Ready. Confirm your phone to unlock it.
+      </p>
+    </div>
   );
 }
 
@@ -336,13 +482,13 @@ function ContactStep({
     }
   }
 
-  async function submit() {
+  async function submit(typedCode = code) {
     if (!check()) return;
     setPending(true);
     setMessage(null);
     try {
       if (needsCode) {
-        const checked = await postJson<{ ok: boolean; message?: string }>("/api/verify/check", { phone, code });
+        const checked = await postJson<{ ok: boolean; message?: string }>("/api/verify/check", { phone, code: typedCode });
         if (!checked.ok) {
           setErrors({ code: checked.message ?? "That code didn't match." });
           return;
@@ -379,7 +525,7 @@ function ContactStep({
 
   return (
     <form
-      className="p-6 sm:p-8"
+      className="p-5 sm:p-8"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -388,15 +534,15 @@ function ContactStep({
       }}
     >
       <Progress at={2} />
-      <h2 className="mt-6 font-display text-4xl leading-tight">Who is this report for?</h2>
-      <p className="mt-2 text-sm leading-6 text-ink-soft">
-        Your report gets a private link and a PDF you can download or email yourself.{" "}
-        {needsCode ? "We text a code to confirm your number." : ""}
+      <h2 className="mt-5 font-display text-3xl leading-tight sm:text-4xl">Your report is ready</h2>
+      <ReportTeaser property={property} />
+      <p className="mt-4 text-sm leading-6 text-ink-soft">
+        {needsCode ? "We text you a code to confirm it's you. " : ""}Your report gets a private link and a PDF to download.
       </p>
 
       <div className="mt-6 space-y-3">
         <label className="block">
-          <RequiredLabel>Full name</RequiredLabel>
+          <RequiredLabel>Your name</RequiredLabel>
           <input
             autoComplete="name"
             aria-required="true"
@@ -446,7 +592,12 @@ function ContactStep({
               inputMode="numeric"
               value={code}
               autoFocus
-              onChange={(event) => setCode(event.target.value)}
+              onChange={(event) => {
+                const next = event.target.value.replace(/\D/g, "").slice(0, 6);
+                setCode(next);
+                // A full code from the text (or autofill) opens the report without another tap.
+                if (next.length === 6 && !pending) void submit(next);
+              }}
               aria-invalid={Boolean(errors.code) || undefined}
               className={`${field} tracking-[0.3em] ${errors.code ? "border-clay" : "border-line"}`}
             />
@@ -470,7 +621,7 @@ function ContactStep({
         disabled={pending || verify == null}
         className="mt-6 inline-flex min-h-13 w-full items-center justify-center rounded-full bg-ink px-6 py-3.5 text-base font-semibold text-white hover:bg-ink/85 disabled:opacity-60"
       >
-        {pending ? "One moment…" : needsCode && !codeSent ? "Text me a code" : "Open my ROI report"}
+        {pending ? "One moment…" : needsCode && !codeSent ? "Text me my code" : "Unlock my report"}
       </button>
       <button type="button" onClick={onBack} className="mt-3 w-full text-sm font-medium text-ink-soft hover:text-ink">
         Back

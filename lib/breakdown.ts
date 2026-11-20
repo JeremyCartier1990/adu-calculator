@@ -110,7 +110,7 @@ export function breakdownSteps(estimate: Estimate, financing: Financing): Breakd
         { label: "City permits", math: `${formatMoney(permits.cityPermitBase)} + ${formatMoney(permits.cityPermitPerSqft)} × ${size}`, value: formatMoney(estimate.cityFees) },
         { label: "Total investment", value: formatMoney(estimate.total), strong: true },
       ],
-      note: `${estimate.finishLabel} finish rate for a ${estimate.projectLabel.replace(/^\w/, (letter) => letter.toLowerCase())}. School fees and utility connections aren't included.`,
+      note: `${estimate.finishLabel} finish rate for ${/^[aeiou]/i.test(estimate.projectLabel) ? "an" : "a"} ${estimate.projectLabel.replace(/^\w/, (letter) => letter.toLowerCase())}. School fees and utility connections aren't included.`,
     },
     {
       n: "2",

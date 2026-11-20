@@ -38,7 +38,7 @@ export function InvestmentSummary({ estimate, summary }: { estimate: Estimate; s
   return (
     <div className="text-white">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">The short answer</p>
-      <p className="mt-3 max-w-4xl font-display text-2xl leading-snug sm:text-[2rem] sm:leading-[1.25]">
+      <p className="mt-3 max-w-4xl font-display text-xl leading-snug sm:text-[2rem] sm:leading-[1.25]">
         Invest <strong className="font-semibold text-white">{formatMoney(summary.invest)}</strong> in a {projectPhrase(estimate)} and your home could be worth{" "}
         <strong className="font-semibold text-[#7fd6a8]">{formatMoney(summary.valueAdded)} more</strong>. Rented out, it would leave you{" "}
         <strong className={`font-semibold ${flowTone(summary.longTerm)}`}>{formatMoney(summary.longTerm)}</strong> a month on a lease, or{" "}
@@ -55,7 +55,7 @@ export function InvestmentSummary({ estimate, summary }: { estimate: Estimate; s
 
       <div className="mt-6 grid gap-3 md:grid-cols-[1fr_auto_1fr_auto_1.15fr] md:gap-2">
         <Block label="You invest">
-          <p className="mt-2 font-display text-4xl tabular-nums">{formatMoney(summary.invest)}</p>
+          <p className="mt-2 font-display text-3xl tabular-nums sm:text-4xl">{formatMoney(summary.invest)}</p>
           <p className="mt-2 text-sm leading-5 text-white/65">
             {estimate.bedroomLabel} · {estimate.finishLabel} finish
             <br />
@@ -64,7 +64,7 @@ export function InvestmentSummary({ estimate, summary }: { estimate: Estimate; s
         </Block>
         <Arrow />
         <Block label="Your home gains">
-          <p className="mt-2 font-display text-4xl tabular-nums text-[#7fd6a8]">+{formatMoney(summary.valueAdded)}</p>
+          <p className="mt-2 font-display text-3xl tabular-nums text-[#7fd6a8] sm:text-4xl">+{formatMoney(summary.valueAdded)}</p>
           <p className="mt-2 text-sm leading-5 text-white/65">
             {summary.homeValueBefore != null && summary.homeValueAfter != null ? (
               <>
@@ -84,7 +84,7 @@ export function InvestmentSummary({ estimate, summary }: { estimate: Estimate; s
             ].map(([label, value]) => (
               <div key={label as string} className="flex items-baseline justify-between gap-3">
                 <dt className="text-sm text-white/75">{label}</dt>
-                <dd className={`font-display text-3xl tabular-nums ${flowTone(value as number)}`}>{formatMoney(value as number)}</dd>
+                <dd className={`font-display text-2xl tabular-nums sm:text-3xl ${flowTone(value as number)}`}>{formatMoney(value as number)}</dd>
               </div>
             ))}
           </dl>
