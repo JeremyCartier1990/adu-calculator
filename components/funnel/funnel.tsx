@@ -5,6 +5,7 @@ import { AnalysisSection } from "@/components/funnel/analysis";
 import { AddressInput } from "@/components/funnel/address-input";
 import { ArrowBox } from "@/components/eyebrow";
 import { Hero } from "@/components/hero";
+import { captureAttribution, readAttribution } from "@/lib/attribution";
 import { trackLeadConversion } from "@/lib/redtrack";
 import { rememberEditKey } from "@/lib/report-keys";
 import { validateAddress } from "@/lib/address";
@@ -109,6 +110,8 @@ export function Funnel() {
   useEffect(() => {
     if (step === "analysis") document.getElementById("analysis")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [step]);
+
+  useEffect(captureAttribution, []);
 
   // Every "Get my report" link on the page lands in the address field, ready to type.
   useEffect(() => {
@@ -501,7 +504,13 @@ function ContactStep({
         code?: string;
         message?: string;
         errors?: Record<string, string>;
-      }>("/api/reports", { name, phone, property, companyWebsite: website });
+      }>("/api/reports", {
+        name,
+        phone,
+        property,
+        companyWebsite: website,
+        attribution: readAttribution(),
+      });
       if (data.ok && data.id && data.editKey) {
         onDone({ id: data.id, editKey: data.editKey }, null);
         return;

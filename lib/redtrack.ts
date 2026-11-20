@@ -8,7 +8,8 @@ export const REDTRACK_SCRIPT = `${REDTRACK_DOMAIN}/uniclick.js?attribution=lastp
 const LEAD_TYPE = "Lead";
 const STORE_KEY = "rtkclickid-store";
 
-function readClickId(): string | null {
+/** The paid click id: from the URL, or where the RedTrack script stored it. */
+export function readClickId(): string | null {
   const fromUrl = new URLSearchParams(window.location.search).get("rtkcid");
   if (fromUrl) return fromUrl;
   const cookie = document.cookie.split("; ").find((part) => part.startsWith(`${STORE_KEY}=`));

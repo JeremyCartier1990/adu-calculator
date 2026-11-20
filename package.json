@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test --test-concurrency=1 lib/calculate.test.ts lib/rentcast.test.ts lib/lead.test.ts lib/rate-limit.test.ts lib/airroi.test.ts lib/verify-cookie.test.ts lib/propertyreach.test.ts lib/footprint.test.ts lib/financing.test.ts lib/address.test.ts lib/report.test.ts lib/optimize.test.ts"
+    "test": "tsx --test --test-concurrency=1 lib/calculate.test.ts lib/rentcast.test.ts lib/lead.test.ts lib/rate-limit.test.ts lib/airroi.test.ts lib/verify-cookie.test.ts lib/propertyreach.test.ts lib/footprint.test.ts lib/financing.test.ts lib/address.test.ts lib/report.test.ts lib/optimize.test.ts lib/lead-webhook.test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",

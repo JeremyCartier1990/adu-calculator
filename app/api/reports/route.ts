@@ -1,7 +1,9 @@
 import { after } from "next/server";
 import { addressIdentity } from "@/lib/address";
+import { parseAttribution } from "@/lib/attribution";
 import { emailDomainAcceptsMail } from "@/lib/email-check";
 import { validateLead } from "@/lib/lead";
+import { sendLeadWebhook } from "@/lib/lead-webhook";
 import { clientIp, RATE_LIMITS, takeToken } from "@/lib/rate-limit";
 import { parseConfirmedProperty } from "@/lib/report";
 import { enableSharedPropertyReachCache } from "@/lib/propertyreach-cache";
@@ -34,6 +36,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const property = parseConfirmedProperty(body.property);
+  const attribution = parseAttribution(body.attribution);
   const log = (entry: Partial<Submission> & Pick<Submission, "outcome">) =>
     after(() =>
       recordSubmission({
@@ -41,7 +44,7 @@ export async function POST(request: Request): Promise<Response> {
         email: text(body.email),
         phone: text(body.phone),
         address: property?.address ?? text((body.property as { address?: unknown } | undefined)?.address),
-        detail: property ? { property } : null,
+        detail: property ? { property, attribution } : null,
         ...entry,
       }),
     );
@@ -103,8 +106,8 @@ export async function POST(request: Request): Promise<Response> {
     });
     // One PropertyReach credit per lead, after the response so the homeowner never waits on it.
     after(() => attachFinancials(report));
-    log({ ...contact, outcome: "created", reportId: report.id });
-    // TODO(crm): forward new reports to the CRM or a team notification. The report URL is the handoff.
+    log({ ...contact, outcome: "created", reportId: report.id, detail: { property, attribution } });
+    after(() => sendLeadWebhook(report, attribution));
     console.info(JSON.stringify({ event: "report_created", id: report.id, phoneVerified, source: property.source }));
     return json({ ok: true, id: report.id, editKey });
   } catch (error) {
