@@ -1,6 +1,6 @@
 import type { Estimate } from "@/lib/calculate";
 import type { Financing } from "@/lib/financing";
-import { FINANCING } from "@/lib/financing";
+import { FINANCING, refinanceAfterBuild } from "@/lib/financing";
 import { formatMoney } from "@/lib/money";
 import { formatPercent } from "@/lib/report";
 
@@ -25,6 +25,7 @@ const pct = (rate: number) => `${(rate * 100).toFixed(2)}%`;
 export function FinancingSummary({ financing, estimate }: { financing: Financing; estimate: Estimate }) {
   const refinance = financing.plan === "refinance";
   const projectCost = estimate.total;
+  const after = refinanceAfterBuild(financing, estimate.blendedUplift);
   const rentals = [
     { id: "long_term", label: "Long-term lease", net: estimate.scenarios.longTerm.monthlyNet },
     { id: "short_term", label: "Short-term rental", net: estimate.scenarios.shortTerm.monthlyNet },
@@ -64,11 +65,12 @@ export function FinancingSummary({ financing, estimate }: { financing: Financing
             <Line label="Project cost" value={formatMoney(projectCost)} />
             {refinance ? (
               <>
+                {financing.cashDown > 0 ? <Line label="Cash you put in" value={formatMoney(financing.cashDown)} /> : null}
                 <Line label="Cash-out refinance" value={formatMoney(financing.cashOut)} hint={`Up to ${formatMoney(financing.cashOutAvailable)} at ${Math.round(FINANCING.maxLoanToValue * 100)}% of value`} />
                 <Line label="Unsecured loan" value={formatMoney(financing.unsecuredAmount)} hint={`${pct(financing.unsecuredRate)}, ${financing.unsecuredYears} years, up to ${formatMoney(FINANCING.unsecuredMax)}`} />
               </>
             ) : null}
-            <Line label="From savings" value={formatMoney(financing.cashFromOwner)} strong />
+            <Line label="From savings in all" value={formatMoney(financing.cashFromOwner)} strong />
           </dl>
         </div>
 
@@ -89,6 +91,27 @@ export function FinancingSummary({ financing, estimate }: { financing: Financing
           </dl>
         </div>
       </div>
+
+      {after ? (
+        <div className="rounded-xl border border-pine/30 bg-pine-soft p-4 sm:p-5">
+          <h4 className="text-sm font-semibold text-pine">Once it&apos;s built: refinance the loan</h4>
+          <p className="mt-1 text-sm leading-6 text-ink-soft">
+            The lender appraises the home with the ADU at about {formatMoney(after.appraisedValue)}. That value lets one mortgage pay off{" "}
+            {after.unsecuredLeft > 0 ? `${formatMoney(after.unsecuredPaidOff)} of the` : "the"} unsecured loan at {pct(financing.refiRate)} instead of{" "}
+            {pct(financing.unsecuredRate)}.
+            {after.monthlySavings > 0
+              ? ` That's ${formatMoney(after.monthlySavings)} less a month.`
+              : " Here the closing costs on the new mortgage outweigh the lower rate, so keeping the personal loan is cheaper."}
+          </p>
+          <dl className="mt-1 text-sm">
+            <Line label="New mortgage" value={formatMoney(after.newLoan)} hint={`${pct(financing.refiRate)}, ${FINANCING.refiYears} years, closing costs rolled in`} />
+            <Line label="Added loan payments" value={`${formatMoney(after.monthlyDebt)} / mo`} hint={`Was ${formatMoney(financing.monthlyDebt)} / mo`} />
+            {rentals.map((rental) => (
+              <Line key={rental.id} label={`You keep, ${rental.label.toLowerCase()}`} value={`${formatMoney(rental.net - after.monthlyDebt)} / mo`} strong={rental.id === "long_term"} />
+            ))}
+          </dl>
+        </div>
+      ) : null}
 
       {refinance && financing.homeValue > 0 ? (
         <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-line bg-line text-sm">

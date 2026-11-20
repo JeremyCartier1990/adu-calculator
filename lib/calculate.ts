@@ -142,6 +142,20 @@ export function fallbackMonthlyRent(sqft: number, bedrooms: number): number {
   return dollars(clampSqft(sqft) * rate);
 }
 
+type UnitSize = { sqft: number; bedrooms: number };
+
+/** A rent measured for one unit, carried to another size along the planning rates' curve. */
+export function scaleRent(rent: number, from: UnitSize, to: UnitSize): number {
+  const base = fallbackMonthlyRent(from.sqft, from.bedrooms);
+  return base > 0 ? dollars((rent * fallbackMonthlyRent(to.sqft, to.bedrooms)) / base) : rent;
+}
+
+/** A nightly rate measured for one bedroom count, carried to another with the planning nightly rates. */
+export function scaleNightlyRate(rate: number, fromBedrooms: number, toBedrooms: number): number {
+  const table = ASSUMPTIONS.shortTerm.fallbackNightlyRate;
+  return dollars((rate * table[bedroomCount(toBedrooms)]) / table[bedroomCount(fromBedrooms)]);
+}
+
 function bedroomCount(bedrooms: number): BedroomCount {
   if (bedrooms <= 0) return 0;
   if (bedrooms >= 3) return 3;

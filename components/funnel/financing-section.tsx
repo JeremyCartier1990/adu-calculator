@@ -88,6 +88,13 @@ export function FinancingSection({ state, estimate }: { state: FinancingState; e
 
           {refinance ? (
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <Field
+                {...field("cashDown")}
+                label="Cash you put in"
+                unit="$"
+                placeholder="0"
+                hint="Paid first; the refinance and loan cover the rest"
+              />
               <Field {...field("homeValue")} label="Home value today" unit="$" placeholder="1,200,000" />
               <Field
                 {...field("mortgageBalance")}

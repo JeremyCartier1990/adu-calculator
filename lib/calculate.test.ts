@@ -6,6 +6,8 @@ import {
   clampOccupancy,
   deriveNightlyRate,
   fallbackMonthlyRent,
+  scaleNightlyRate,
+  scaleRent,
   shortTermMonthlyGross,
   type EstimateInput,
 } from "./calculate";
@@ -180,4 +182,13 @@ test("reports saved with the retired luxury finish open as premium", () => {
   assert.equal(normalizeFinish("luxury"), "premium");
   assert.equal(normalizeFinish("eco"), "eco");
   assert.equal(normalizeFinish("gold"), null);
+});
+
+test("rent and nightly rates scale from the one reference lookup", () => {
+  const reference = { sqft: 800, bedrooms: 2 };
+  assert.equal(scaleRent(4000, reference, reference), 4000);
+  assert.ok(scaleRent(4000, reference, { sqft: 500, bedrooms: 1 }) < 4000);
+  assert.ok(scaleRent(4000, reference, { sqft: 1200, bedrooms: 3 }) > 4000);
+  assert.equal(scaleNightlyRate(240, 2, 2), 240);
+  assert.equal(scaleNightlyRate(240, 2, 1), 185);
 });

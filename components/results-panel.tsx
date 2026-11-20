@@ -56,7 +56,6 @@ export function ResultsPanel({
         <StrPanel
           latitude={latitude}
           longitude={longitude}
-          bedrooms={estimate.bedrooms}
           onMarketNumbers={onMarketNumbers}
           onVerifiedPhone={onVerifiedPhone}
         />

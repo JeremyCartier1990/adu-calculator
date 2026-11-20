@@ -35,6 +35,8 @@ export type FinancingInputs = {
   unsecuredRate: number | null;
   /** Null uses the 20-year default. */
   unsecuredYears?: number | null;
+  /** Cash the homeowner chooses to put in first, before borrowing. */
+  cashDown?: number | null;
 };
 
 export type Financing = {
@@ -58,7 +60,9 @@ export type Financing = {
   unsecuredRate: number;
   unsecuredYears: number;
   unsecuredPayment: number;
-  /** What the homeowner still pays from savings. */
+  /** Cash the homeowner chose to put in, before any borrowing. */
+  cashDown: number;
+  /** What the homeowner pays from savings in all: the cash put in plus anything the loans don't cover. */
   cashFromOwner: number;
   monthlyDebt: number;
   /** ADU net income − added loan payments. */
@@ -110,14 +114,16 @@ export function calculateFinancing(input: FinancingInputs, projectCost: number, 
   let closingCosts = 0;
   let newPayment = currentPayment;
   let unsecuredAmount = 0;
+  const cashDown = input.plan === "refinance" ? Math.min(positive(input.cashDown), cost) : 0;
+  const toBorrow = cost - cashDown;
   if (input.plan === "refinance") {
-    cashOut = Math.min(cost, cashOutAvailable);
+    cashOut = Math.min(toBorrow, cashOutAvailable);
     if (cashOut > 0) {
       newLoan = dollars((mortgageBalance + cashOut) / (1 - FINANCING.closingCostRate));
       closingCosts = newLoan - mortgageBalance - cashOut;
       newPayment = monthlyPayment(newLoan, refiRate, FINANCING.refiYears);
     }
-    unsecuredAmount = Math.min(cost - cashOut, FINANCING.unsecuredMax);
+    unsecuredAmount = Math.min(toBorrow - cashOut, FINANCING.unsecuredMax);
     if (homeValue === 0) warnings.push("Add the home's value to see how much a refinance could release.");
     else if (cashOutAvailable === 0) warnings.push("At 80% of the home's value there's no equity to take out, so the refinance doesn't fund the build.");
     if (cashOut > 0 && currentRate != null && refiRate > currentRate + 0.0025) {
@@ -130,8 +136,9 @@ export function calculateFinancing(input: FinancingInputs, projectCost: number, 
   const unsecuredPayment = monthlyPayment(unsecuredAmount, unsecuredRate, unsecuredYears);
   const addedMortgagePayment = newPayment - currentPayment;
   const cashFromOwner = Math.max(0, cost - cashOut - unsecuredAmount);
-  if (input.plan === "refinance" && cashFromOwner > 0 && homeValue > 0) {
-    warnings.push(`The refinance and a ${dollarsLabel(FINANCING.unsecuredMax)} unsecured loan leave ${dollarsLabel(cashFromOwner)} to pay from savings.`);
+  const shortfall = cashFromOwner - cashDown;
+  if (input.plan === "refinance" && shortfall > 0 && homeValue > 0) {
+    warnings.push(`The refinance and a ${dollarsLabel(FINANCING.unsecuredMax)} unsecured loan leave ${dollarsLabel(shortfall)} more to pay from savings.`);
   }
   const monthlyDebt = addedMortgagePayment + unsecuredPayment;
   const monthlyCashFlow = dollars(monthlyNetIncome - monthlyDebt);
@@ -156,6 +163,7 @@ export function calculateFinancing(input: FinancingInputs, projectCost: number, 
     unsecuredRate,
     unsecuredYears,
     unsecuredPayment,
+    cashDown,
     cashFromOwner,
     monthlyDebt,
     monthlyCashFlow,
@@ -163,6 +171,54 @@ export function calculateFinancing(input: FinancingInputs, projectCost: number, 
     cashOnCash: cashFromOwner > 0 ? annualCashFlow / cashFromOwner : null,
     loanToValueAfter: homeValue > 0 ? newLoan / homeValue : null,
     warnings,
+  };
+}
+
+/** Once the ADU is finished: the home is appraised with it, and the unsecured loan is rolled into the mortgage. */
+export type RefinanceAfter = {
+  appraisedValue: number;
+  /** 80% of the new appraised value. */
+  maxLoan: number;
+  /** Unsecured balance paid off by the new mortgage; the rest, if any, stays as a personal loan. */
+  unsecuredPaidOff: number;
+  unsecuredLeft: number;
+  newLoan: number;
+  newPayment: number;
+  unsecuredPayment: number;
+  /** Added payments vs. before the ADU, after this refinance. */
+  monthlyDebt: number;
+  /** How much less each month than while the unsecured loan is open. */
+  monthlySavings: number;
+  interestSavedYearOne: number;
+};
+
+/**
+ * The refinance after completion. The unsecured balance is taken as the full
+ * amount, since the refinance happens soon after the build; closing costs are rolled in.
+ * Null when there's no unsecured loan to refinance.
+ */
+export function refinanceAfterBuild(financing: Financing, valueAdded: number): RefinanceAfter | null {
+  if (financing.plan !== "refinance" || financing.unsecuredAmount <= 0 || financing.homeValue <= 0) return null;
+  const appraisedValue = financing.homeValue + Math.max(0, valueAdded);
+  const maxLoan = dollars(appraisedValue * FINANCING.maxLoanToValue);
+  const room = Math.max(0, dollars(maxLoan * (1 - FINANCING.closingCostRate) - financing.newLoan));
+  const unsecuredPaidOff = Math.min(financing.unsecuredAmount, room);
+  const unsecuredLeft = financing.unsecuredAmount - unsecuredPaidOff;
+  const newLoan = unsecuredPaidOff > 0 ? dollars((financing.newLoan + unsecuredPaidOff) / (1 - FINANCING.closingCostRate)) : financing.newLoan;
+  const newPayment = monthlyPayment(newLoan, financing.refiRate, FINANCING.refiYears);
+  const unsecuredPayment = monthlyPayment(unsecuredLeft, financing.unsecuredRate, financing.unsecuredYears);
+  const monthlyDebt = newPayment - financing.currentPayment + unsecuredPayment;
+  return {
+    appraisedValue,
+    maxLoan,
+    unsecuredPaidOff,
+    unsecuredLeft,
+    newLoan,
+    newPayment,
+    unsecuredPayment,
+    monthlyDebt,
+    monthlySavings: financing.monthlyDebt - monthlyDebt,
+    interestSavedYearOne: dollars(unsecuredPaidOff * (financing.unsecuredRate - financing.refiRate)),
   };
 }
 
@@ -191,5 +247,6 @@ export function parseFinancingInputs(input: unknown): FinancingInputs | null {
     refiRateAsOf: typeof data.refiRateAsOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.refiRateAsOf) ? data.refiRateAsOf : null,
     unsecuredRate: bounded(data.unsecuredRate, 0, 0.4),
     unsecuredYears: bounded(data.unsecuredYears, 1, FINANCING.unsecuredMaxYears),
+    cashDown: bounded(data.cashDown, 0, 100_000_000),
   };
 }

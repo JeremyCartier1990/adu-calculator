@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateFinancing, FINANCING, monthlyPayment, parseFinancingInputs, type FinancingInputs } from "./financing";
+import { calculateFinancing, FINANCING, monthlyPayment, parseFinancingInputs, refinanceAfterBuild, type FinancingInputs } from "./financing";
 
 const BASE: FinancingInputs = {
   plan: "refinance",
@@ -78,4 +78,39 @@ test("the unsecured loan term defaults to 20 years and can be changed", () => {
   assert.equal(short.unsecuredYears, 7);
   assert.equal(short.unsecuredPayment, monthlyPayment(80_000, 0.12, 7));
   assert.equal(calculateFinancing({ ...plan, unsecuredYears: 99 }, 80_000, 1_000).unsecuredYears, 20);
+});
+
+test("after the build, the reappraised home refinances the unsecured loan at the mortgage rate", () => {
+  const during = calculateFinancing({ ...BASE, homeValue: 900_000 }, 300_000, 2_000);
+  assert.equal(during.unsecuredAmount, 100_000);
+  const after = refinanceAfterBuild(during, 350_000)!;
+  assert.equal(after.appraisedValue, 1_250_000);
+  assert.equal(after.unsecuredPaidOff, 100_000);
+  assert.equal(after.unsecuredLeft, 0);
+  assert.equal(after.unsecuredPayment, 0);
+  assert.ok(after.newLoan <= after.maxLoan);
+  assert.equal(after.newPayment, monthlyPayment(after.newLoan, 0.07, 30));
+  assert.ok(after.monthlySavings > 0);
+});
+
+test("a small value gain only pays off part of the unsecured loan", () => {
+  const during = calculateFinancing({ ...BASE, homeValue: 900_000 }, 300_000, 2_000);
+  const after = refinanceAfterBuild(during, 20_000)!;
+  assert.ok(after.unsecuredPaidOff > 0 && after.unsecuredPaidOff < 100_000);
+  assert.equal(after.unsecuredLeft, 100_000 - after.unsecuredPaidOff);
+});
+
+test("nothing to refinance without an unsecured loan", () => {
+  assert.equal(refinanceAfterBuild(calculateFinancing(BASE, 300_000, 2_000), 400_000), null);
+  assert.equal(refinanceAfterBuild(calculateFinancing({ ...BASE, plan: "cash" }, 300_000, 2_000), 400_000), null);
+});
+
+test("cash put in first shrinks what's borrowed", () => {
+  const plan = calculateFinancing({ ...BASE, homeValue: 900_000, cashDown: 150_000 }, 300_000, 2_000);
+  assert.equal(plan.cashDown, 150_000);
+  assert.equal(plan.cashOut, 105_600);
+  assert.equal(plan.unsecuredAmount, 300_000 - 150_000 - 105_600);
+  assert.equal(plan.cashFromOwner, 150_000);
+  assert.ok(!plan.warnings.some((warning) => warning.includes("more to pay from savings")));
+  assert.equal(calculateFinancing({ ...BASE, cashDown: 999_999 }, 300_000, 2_000).cashFromOwner, 300_000);
 });

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { scaleRent } from "./calculate";
 import { SAMPLE_ADDRESS } from "./sample-home";
 import {
   hasFreshRentCastCache,
@@ -168,6 +169,40 @@ test("rent lookup reads the AVM and fills gaps from the subject property", async
       assert.equal(rent.rent, 4100);
       assert.equal(rent.squareFootage, 800);
       assert.equal(rent.rentRangeLow, 3800);
+    }
+  } finally {
+    globalThis.fetch = original;
+    if (previous == null) delete process.env.RENTCAST_API_KEY;
+    else process.env.RENTCAST_API_KEY = previous;
+    resetRentCastForTests();
+  }
+});
+
+test("every ADU size shares one RentCast rent call per address", async () => {
+  const previous = process.env.RENTCAST_API_KEY;
+  process.env.RENTCAST_API_KEY = "test-key";
+  resetRentCastForTests();
+  const requested: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    requested.push(String(input));
+    return new Response(JSON.stringify({ rent: 4000, rentRangeLow: 3600, rentRangeHigh: 4400 }), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const small = await lookupRent(SAMPLE_ADDRESS, 400, 0);
+    const large = await lookupRent(SAMPLE_ADDRESS, 1200, 3);
+    const same = await lookupRent(SAMPLE_ADDRESS, 800, 2);
+    assert.equal(requested.length, 1);
+    const url = new URL(requested[0]);
+    assert.equal(url.searchParams.get("squareFootage"), "800");
+    assert.equal(url.searchParams.get("bedrooms"), "2");
+    assert.ok(small.ok && large.ok && same.ok);
+    if (small.ok && large.ok && same.ok) {
+      assert.equal(same.rent, 4000);
+      assert.equal(small.reference.rent, 4000);
+      assert.equal(small.rent, scaleRent(4000, { sqft: 800, bedrooms: 2 }, { sqft: 400, bedrooms: 0 }));
+      assert.ok(small.rent < same.rent && same.rent < large.rent);
     }
   } finally {
     globalThis.fetch = original;

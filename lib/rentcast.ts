@@ -1,6 +1,7 @@
 import { normalizeAddress } from "./address";
 import { ASSUMPTIONS, snapSqft } from "./assumptions";
 import type { PropertyFacts, PropertyLookup, RentLookup, ValueFacts } from "./api-types";
+import { scaleRent } from "./calculate";
 
 export type { PropertyFacts, PropertyLookup, RentLookup, ValueFacts };
 
@@ -60,6 +61,12 @@ export function propertyRequestUrls(address: string): { records: string; value: 
       compCount: ASSUMPTIONS.rent.compCount,
     }),
   };
+}
+
+/** The one rent query made per address, whatever size the homeowner picks. */
+export function referenceRentUrl(address: string): string {
+  const { sqft, bedrooms } = ASSUMPTIONS.rent.reference;
+  return rentRequestUrl(address, sqft, bedrooms);
 }
 
 export function rentRequestUrl(address: string, squareFootage: number, bedrooms: number): string {
@@ -318,7 +325,8 @@ export async function lookupRent(
 ): Promise<RentLookup> {
   const snapped = snapSqft(squareFootage);
   const beds = Math.min(3, Math.max(0, Math.round(bedrooms)));
-  const url = rentRequestUrl(address, snapped, beds);
+  const reference = ASSUMPTIONS.rent.reference;
+  const url = referenceRentUrl(address);
 
   let result: { payload: RentCastPayload; cached: boolean };
   try {
@@ -348,13 +356,17 @@ export async function lookupRent(
     };
   }
 
+  const low = positive(body?.rentRangeLow);
+  const high = positive(body?.rentRangeHigh);
+  const target = { sqft: snapped, bedrooms: beds };
   return {
     ok: true,
     cached: result.cached,
-    rent: Math.round(rent),
-    rentRangeLow: positive(body?.rentRangeLow),
-    rentRangeHigh: positive(body?.rentRangeHigh),
+    rent: scaleRent(rent, reference, target),
+    rentRangeLow: low == null ? null : scaleRent(low, reference, target),
+    rentRangeHigh: high == null ? null : scaleRent(high, reference, target),
     squareFootage: snapped,
     bedrooms: beds,
+    reference: { ...reference, rent: Math.round(rent), rentRangeLow: low, rentRangeHigh: high },
   };
 }

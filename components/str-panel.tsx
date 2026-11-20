@@ -7,10 +7,11 @@ import { formatMoney } from "@/lib/money";
 
 type MarketNumbers = { adr: number; occupancy: number };
 
+const REFERENCE = ASSUMPTIONS.rent.reference;
+
 type StrPanelProps = {
   latitude: number | null;
   longitude: number | null;
-  bedrooms: number;
   onMarketNumbers: (numbers: MarketNumbers | null) => void;
   onVerifiedPhone: (phone: string | null) => void;
 };
@@ -24,7 +25,7 @@ type StatusResponse = {
   team?: boolean;
 };
 
-export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVerifiedPhone }: StrPanelProps) {
+export function StrPanel({ latitude, longitude, onMarketNumbers, onVerifiedPhone }: StrPanelProps) {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -56,6 +57,7 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
 
   const allowed = Boolean(status?.airroi && (status.verified || status.team));
 
+  // One lookup per map point, about the reference unit; the builder scales it to the ADU's size.
   useEffect(() => {
     if (!allowed || latitude == null || longitude == null) return;
     const controller = new AbortController();
@@ -66,9 +68,9 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
         body: JSON.stringify({
           latitude,
           longitude,
-          bedrooms,
+          bedrooms: REFERENCE.bedrooms,
           baths: ASSUMPTIONS.rent.bathrooms,
-          guests: guestsForBedrooms(bedrooms),
+          guests: guestsForBedrooms(REFERENCE.bedrooms),
         }),
         signal: controller.signal,
       })
@@ -98,7 +100,7 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
       clearTimeout(timer);
       controller.abort();
     };
-  }, [allowed, bedrooms, latitude, longitude, onMarketNumbers]);
+  }, [allowed, latitude, longitude, onMarketNumbers]);
 
   async function sendCode() {
     setPending(true);
@@ -238,7 +240,8 @@ function MarketDetails({ estimate }: { estimate: StrEstimate }) {
   return (
     <div className="mt-3 space-y-3">
       <p className="text-sm leading-6 text-ink-soft">
-        AirROI estimate for an entire-home ADU. This is market data, separate from the planning costs used in payback.
+        AirROI estimate for a {REFERENCE.bedrooms}-bedroom entire home at this address. The builder scales the nightly rate to the ADU&apos;s own
+        bedroom count, so changing the size never buys another lookup.
       </p>
       <dl className="grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-xl bg-white px-3 py-2">

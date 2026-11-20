@@ -5,7 +5,7 @@ import { clientIp, RATE_LIMITS, takeToken } from "@/lib/rate-limit";
 import {
   hasFreshRentCastCache,
   lookupRent,
-  rentRequestUrl,
+  referenceRentUrl,
   RENTCAST_NOT_CONFIGURED_MESSAGE,
 } from "@/lib/rentcast";
 import { enableSharedRentCastCache } from "@/lib/rentcast-cache";
@@ -46,7 +46,8 @@ export async function POST(request: Request): Promise<Response> {
     return json({ ok: false, code: "not_configured", message: RENTCAST_NOT_CONFIGURED_MESSAGE });
   }
 
-  const url = rentRequestUrl(parsed.address, squareFootage, bedrooms);
+  // Every size shares one RentCast query per address, so only a new address can cost a call.
+  const url = referenceRentUrl(parsed.address);
   if (!hasFreshRentCastCache(url) && !takeToken("rent", clientIp(request), RATE_LIMITS.rent.limit, RATE_LIMITS.rent.windowMs)) {
     return json(
       {

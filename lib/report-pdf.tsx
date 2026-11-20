@@ -6,7 +6,7 @@ import { ASSUMPTIONS } from "./assumptions";
 import { BRAND } from "./brand";
 import { breakdownSteps, financingFor, headline, settingsUsed, type BreakdownStep, type Headline } from "./breakdown";
 import type { Estimate, RentalScenario } from "./calculate";
-import { FINANCING, type Financing } from "./financing";
+import { FINANCING, refinanceAfterBuild, type Financing } from "./financing";
 import { formatMoney, formatNumber, formatYears } from "./money";
 import { bestSetup } from "./optimize";
 import { cashOnCash, estimateReport, formatPercent, type ReportRecord } from "./report";
@@ -46,17 +46,17 @@ const s = StyleSheet.create({
   columns: { flexDirection: "row", gap: 14 },
   column: { flex: 1 },
   card: { padding: 10, borderWidth: 1, borderColor: LINE, borderRadius: 8 },
-  row: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2.2 },
+  row: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 1.8 },
   rowStrong: { flexDirection: "row", justifyContent: "space-between", paddingTop: 5, marginTop: 3, borderTopWidth: 1, borderTopColor: LINE },
   bold: { fontFamily: "Helvetica-Bold" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 8 },
   chip: { fontSize: 7, color: SOFT, borderWidth: 1, borderColor: LINE, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2.5 },
-  step: { marginTop: 8, borderWidth: 1, borderColor: LINE, borderRadius: 8, padding: 9 },
+  step: { marginTop: 7, borderWidth: 1, borderColor: LINE, borderRadius: 8, padding: 8 },
   stepHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
   stepTitle: { flexDirection: "row", alignItems: "center", gap: 6 },
   stepN: { width: 15, height: 15, borderRadius: 7.5, backgroundColor: INK, alignItems: "center", justifyContent: "center" },
-  stepLine: { paddingVertical: 2.2, borderTopWidth: 1, borderTopColor: "#f0eee9" },
-  stepLineStrong: { paddingVertical: 2.5, borderTopWidth: 1, borderTopColor: LINE },
+  stepLine: { paddingVertical: 1.6, borderTopWidth: 1, borderTopColor: "#f0eee9" },
+  stepLineStrong: { paddingVertical: 2, borderTopWidth: 1, borderTopColor: LINE },
   tableHead: { flexDirection: "row", paddingBottom: 4, fontSize: 7, color: SOFT, textTransform: "uppercase", fontFamily: "Helvetica-Bold" },
   tableRow: { flexDirection: "row", paddingVertical: 2.4, borderTopWidth: 1, borderTopColor: LINE },
   cellLabel: { flex: 1.5, color: SOFT },
@@ -235,6 +235,11 @@ function Hero({ estimate, summary }: { estimate: Estimate; summary: Headline }) 
             </View>
           ))}
           <Text style={s.heroSub}>{summary.financed ? `After ${formatMoney(summary.monthlyDebt)} / mo in loan payments` : "Net rent, paid in cash"}</Text>
+          {summary.afterRefinance ? (
+            <Text style={[s.heroSub, { color: MINT }]}>
+              After the refinance: {formatMoney(summary.afterRefinance.longTerm)} lease · {formatMoney(summary.afterRefinance.shortTerm)} short-term
+            </Text>
+          ) : null}
         </HeroBox>
       </View>
     </View>
@@ -395,6 +400,7 @@ function FullReport({ report, estimate, financing, date }: { report: ReportRecor
   const { longTerm, shortTerm } = estimate.scenarios;
   const debt = financing.monthlyDebt;
   const refinance = financing.plan === "refinance";
+  const after = refinanceAfterBuild(financing, estimate.blendedUplift);
   const homeBefore = summary.homeValueBefore;
   const best = bestSetup({ homeSquareFootage: property.squareFootage, homeValue: property.homeValue, lotSize: property.lotSize });
   const onBest = best.projectType === estimate.projectType && best.sqft === estimate.sqft && best.finish === estimate.finish;
@@ -484,7 +490,7 @@ function FullReport({ report, estimate, financing, date }: { report: ReportRecor
         {/* Two columns of steps so the whole explanation fits on one page. */}
         <View style={[s.columns, { gap: 10 }]}>
           <View style={s.column}>
-            {[steps[0], steps[1], steps[4]].map((step) => (
+            {(steps[5] ? [steps[0], steps[1]] : [steps[0], steps[1], steps[4]]).map((step) => (
               <Step key={step.n} step={step} />
             ))}
           </View>
@@ -494,7 +500,23 @@ function FullReport({ report, estimate, financing, date }: { report: ReportRecor
             ))}
           </View>
         </View>
-        <View break />
+        {steps[5] ? (
+          // With a refinance after the build, what you keep before and after it sit side by side.
+          <View style={[s.columns, { gap: 10 }]} wrap={false}>
+            <View style={s.column}>
+              <Step step={steps[4]} />
+            </View>
+            <View style={s.column}>
+              <Step step={steps[5]} />
+            </View>
+          </View>
+        ) : null}
+        <View style={[s.card, { marginTop: 12 }]} wrap={false}>
+          <Text style={s.h3}>Cumulative cash flow over 15 years, before loan payments</Text>
+          <Text style={[s.small, { marginBottom: 8 }]}>Starts at minus the project cost; the line crosses zero when the rent has paid it back.</Text>
+          <CashChart scenarios={[longTerm, shortTerm]} />
+        </View>
+
         <SectionTitle eyebrow="Rental income" title="Lease or short-term rental" intro="The same ADU two ways. Net is after vacancy or management and the added property tax, before loan payments.">
         <View style={[s.card, { marginTop: 10 }]}>
           <Table
@@ -532,16 +554,10 @@ function FullReport({ report, estimate, financing, date }: { report: ReportRecor
         </View>
         </SectionTitle>
 
-        <View style={[s.card, { marginTop: 12 }]} wrap={false}>
-          <Text style={s.h3}>Cumulative cash flow over 15 years, before loan payments</Text>
-          <Text style={[s.small, { marginBottom: 8 }]}>Starts at minus the project cost; the line crosses zero when the rent has paid it back.</Text>
-          <CashChart scenarios={[longTerm, shortTerm]} />
-        </View>
         <Text style={s.disclaimer}>
           Short-term rentals of ADUs may be restricted by local rules. Los Angeles&apos;s home-sharing ordinance limits registration, primary-residence use, and how many nights
           a host can rent. Confirm the rules for this address before counting on nightly income.
         </Text>
-        <View break />
         <SectionTitle eyebrow="Year by year" title="15-year projection" intro={`Rent grows ${pct(ASSUMPTIONS.operations.rentGrowthRate)} a year and the added property tax ${pct(ASSUMPTIONS.operations.propertyTaxGrowthRate)}.`}>
         <View style={[s.card, { marginTop: 10 }]}>
           <Table
@@ -573,6 +589,7 @@ function FullReport({ report, estimate, financing, date }: { report: ReportRecor
             <View style={{ marginTop: 6 }}>
               {refinance ? (
                 <>
+                  {financing.cashDown > 0 ? <Row label="Cash you put in" value={formatMoney(financing.cashDown)} /> : null}
                   <Row label="Home value used" value={formatMoney(financing.homeValue)} />
                   <Row label="Mortgage balance" value={formatMoney(financing.mortgageBalance)} />
                   <Row label="Equity today" value={formatMoney(financing.equity)} />
@@ -583,9 +600,21 @@ function FullReport({ report, estimate, financing, date }: { report: ReportRecor
                   <Row label="Loan-to-value after" value={formatPercent(financing.loanToValueAfter)} />
                 </>
               ) : null}
-              <Row label="From savings" value={formatMoney(financing.cashFromOwner)} />
+              <Row label="From savings in all" value={formatMoney(financing.cashFromOwner)} />
               <Row label="Added loan payments" value={`${formatMoney(debt)} / mo`} strong />
             </View>
+            {after ? (
+              <View style={{ marginTop: 8, padding: 7, borderRadius: 6, backgroundColor: PINE_SOFT }}>
+                <Text style={{ fontSize: 7.5, color: PINE, fontFamily: "Helvetica-Bold" }}>Once it&apos;s built: refinance the loan</Text>
+                <Text style={{ fontSize: 7.5, color: PINE, lineHeight: 1.4, marginTop: 2 }}>
+                  Appraised at about {formatMoney(after.appraisedValue)} with the ADU, one {formatMoney(after.newLoan)} mortgage at {pct(financing.refiRate, 2)} pays off{" "}
+                  {formatMoney(after.unsecuredPaidOff)} of the unsecured loan.{" "}
+                  {after.monthlySavings > 0
+                    ? `Loan payments drop to ${formatMoney(after.monthlyDebt)} / mo, ${formatMoney(after.monthlySavings)} less.`
+                    : "Here the closing costs on the new mortgage outweigh the lower rate, so keeping the personal loan is cheaper."}
+                </Text>
+              </View>
+            ) : null}
             {financing.warnings.map((warning) => (
               <Text key={warning} style={s.warn}>
                 {warning}
@@ -607,7 +636,6 @@ function FullReport({ report, estimate, financing, date }: { report: ReportRecor
             </View>
           </Card>
         </View>
-        <View break />
         <SectionTitle eyebrow="Fine print" title="Every assumption we used" />
         <View style={{ marginTop: 8 }}>
           {[...estimate.warnings, ...estimate.notes].map((note, index) => (

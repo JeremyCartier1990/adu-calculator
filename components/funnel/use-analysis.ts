@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RentLookup } from "@/lib/api-types";
 import { ASSUMPTIONS, bedroomsForSqft, normalizeFinish, snapSqft, type FinishLevelId, type ProjectTypeId } from "@/lib/assumptions";
-import { fallbackMonthlyRent, type RentSource } from "@/lib/calculate";
+import { fallbackMonthlyRent, scaleNightlyRate, scaleRent, type RentSource } from "@/lib/calculate";
 import { dollars, parseNumber, parsePositive } from "@/lib/money";
 import type { LatLng } from "@/lib/footprint";
 import { bestSetup } from "@/lib/optimize";
@@ -16,6 +16,7 @@ const factText = (key: FactKey, value: number | null) =>
   value == null ? "" : key === "yearBuilt" ? String(value) : value.toLocaleString("en-US");
 
 type RentHit = { rent: number; rentRangeLow: number | null; rentRangeHigh: number | null };
+type RentReference = RentHit & { sqft: number; bedrooms: number };
 type MarketNumbers = { adr: number; occupancy: number };
 
 /**
@@ -37,8 +38,9 @@ export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | n
   const [rentOverride, setRentOverride] = useState<string | null>(
     saved?.rentSource === "manual" ? String(saved.monthlyRent) : null,
   );
-  const [rentByKey, setRentByKey] = useState<Record<string, RentHit>>({});
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  // RentCast's answer for the reference unit at this address; every size is scaled from it.
+  const [rentReference, setRentReference] = useState<RentReference | null>(null);
+  const [rentPending, setRentPending] = useState(false);
   const [rentNote, setRentNote] = useState<string | null>(null);
   const [occupancyPercent, setOccupancyPercentState] = useState(
     Math.round((saved?.strOccupancy ?? ASSUMPTIONS.shortTerm.defaultOccupancy) * 100),
@@ -57,20 +59,30 @@ export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | n
   )!;
   const financing = useFinancing(property.homeValue, saved?.financing, teamReportId);
   const occupancyTouched = useRef(saved?.strOccupancy != null);
-  const inflight = useRef(new Set<string>());
+  const inflight = useRef(false);
+  // A lookup that came back empty isn't repeated for other sizes.
+  const rentTried = useRef(false);
 
   const live = property.source === "rentcast";
   const beds = bedroomsForSqft(sqft);
   const snapped = snapSqft(sqft);
-  const rentKey = `${snapped}|${beds}`;
-  const hit = live ? rentByKey[rentKey] : undefined;
+  const target = { sqft: snapped, bedrooms: beds };
+  const hit: RentHit | undefined =
+    live && rentReference
+      ? {
+          rent: scaleRent(rentReference.rent, rentReference, target),
+          rentRangeLow: rentReference.rentRangeLow == null ? null : scaleRent(rentReference.rentRangeLow, rentReference, target),
+          rentRangeHigh: rentReference.rentRangeHigh == null ? null : scaleRent(rentReference.rentRangeHigh, rentReference, target),
+        }
+      : undefined;
 
-  // Debounced RentCast rent for the current size; cached per size step.
+  // One RentCast rent per address, fetched once; size changes rescale it without another call.
   useEffect(() => {
-    if (!live || rentOverride !== null || rentByKey[rentKey] || inflight.current.has(rentKey)) return;
+    if (!live || rentOverride !== null || rentReference || inflight.current || rentTried.current) return;
     const timer = setTimeout(() => {
-      inflight.current.add(rentKey);
-      setPendingKey(rentKey);
+      inflight.current = true;
+      rentTried.current = true;
+      setRentPending(true);
       setRentNote(null);
       fetch("/api/rent", {
         method: "POST",
@@ -83,19 +95,16 @@ export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | n
             setRentNote(data.message);
             return;
           }
-          setRentByKey((current) => ({
-            ...current,
-            [rentKey]: { rent: data.rent, rentRangeLow: data.rentRangeLow, rentRangeHigh: data.rentRangeHigh },
-          }));
+          setRentReference(data.reference);
         })
         .catch(() => setRentNote("The rent estimate didn't load. A planning rate is filled in; edit it if you know the rent."))
         .finally(() => {
-          inflight.current.delete(rentKey);
-          setPendingKey((current) => (current === rentKey ? null : current));
+          inflight.current = false;
+          setRentPending(false);
         });
     }, ASSUMPTIONS.rent.debounceMs);
     return () => clearTimeout(timer);
-  }, [beds, live, property.address, rentByKey, rentKey, rentOverride, snapped]);
+  }, [beds, live, property.address, rentReference, rentOverride, snapped]);
 
   const typedRent = rentOverride == null ? null : parsePositive(rentOverride);
   let monthlyRent: number;
@@ -127,7 +136,7 @@ export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | n
     lotSize: facts.lotSize,
     rentalUse: "long_term",
     strOccupancy: occupancyPercent / 100,
-    strNightlyRate: nightlyTyped ?? market?.adr ?? null,
+    strNightlyRate: nightlyTyped ?? (market ? scaleNightlyRate(market.adr, ASSUMPTIONS.rent.reference.bedrooms, beds) : null),
     footprint,
     financing: financing.inputs,
   };
@@ -176,7 +185,7 @@ export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | n
     rentOverride,
     setRentOverride,
     rentSource,
-    rentPending: pendingKey === rentKey,
+    rentPending,
     rentNote,
     occupancyPercent,
     setOccupancyPercent(value: number) {

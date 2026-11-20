@@ -13,6 +13,7 @@ export type FinancingDraft = {
   refiRate: string;
   unsecuredRate: string;
   unsecuredYears: string;
+  cashDown: string;
 };
 export type FinancingField = keyof FinancingDraft;
 
@@ -46,6 +47,7 @@ export function useFinancing(homeValue: number | null, saved: FinancingInputs | 
     refiRate: percent(saved?.refiRate != null && saved.refiRateAsOf == null ? saved.refiRate : FINANCING.defaultRefiRate),
     unsecuredRate: percent(saved?.unsecuredRate ?? FINANCING.unsecuredRate),
     unsecuredYears: String(saved?.unsecuredYears ?? FINANCING.unsecuredYears),
+    cashDown: money(saved?.cashDown),
   });
   const [market, setMarket] = useState<{ rate: number; asOf: string } | null>(null);
   const [onRecord, setOnRecord] = useState<{ openLoans: number } | null>(null);
@@ -102,6 +104,7 @@ export function useFinancing(homeValue: number | null, saved: FinancingInputs | 
     refiRateAsOf: null,
     unsecuredRate: rate(draft.unsecuredRate),
     unsecuredYears: amount(draft.unsecuredYears),
+    cashDown: amount(draft.cashDown),
   };
 
   return {

@@ -36,5 +36,7 @@ export type RentLookup =
       rentRangeHigh: number | null;
       squareFootage: number;
       bedrooms: number;
+      /** The one unit RentCast was asked about for this address; the figures above are scaled from it. */
+      reference: { sqft: number; bedrooms: number; rent: number; rentRangeLow: number | null; rentRangeHigh: number | null };
     }
   | { ok: false; code: "not_found" | "not_configured" | "upstream"; message: string };

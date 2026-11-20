@@ -1,6 +1,6 @@
 import { ASSUMPTIONS } from "./assumptions";
 import type { Estimate } from "./calculate";
-import { calculateFinancing, FINANCING, type Financing, type FinancingInputs } from "./financing";
+import { calculateFinancing, FINANCING, refinanceAfterBuild, type Financing, type FinancingInputs, type RefinanceAfter } from "./financing";
 import { formatMoney, formatNumber } from "./money";
 
 /**
@@ -22,6 +22,8 @@ export type Headline = {
   longTerm: number;
   shortTerm: number;
   funding: string;
+  /** Once the ADU is built and the home reappraised, the unsecured loan folds into the mortgage. */
+  afterRefinance: { monthlyDebt: number; longTerm: number; shortTerm: number; savings: number } | null;
 };
 
 const CASH: FinancingInputs = {
@@ -46,16 +48,19 @@ const minus = (value: number) => `−${formatMoney(value)}`;
 
 function fundingLine(financing: Financing): string {
   if (financing.plan === "cash") return "paid from savings";
+  const shortfall = financing.cashFromOwner - financing.cashDown;
   const parts = [
+    financing.cashDown > 0 ? `${formatMoney(financing.cashDown)} cash` : null,
     financing.cashOut > 0 ? `${formatMoney(financing.cashOut)} cash-out refinance` : null,
     financing.unsecuredAmount > 0 ? `${formatMoney(financing.unsecuredAmount)} unsecured loan` : null,
-    financing.cashFromOwner > 0 ? `${formatMoney(financing.cashFromOwner)} from savings` : null,
+    shortfall > 0 ? `${formatMoney(shortfall)} more from savings` : null,
   ].filter(Boolean);
   return parts.join(" + ") || "nothing to fund";
 }
 
 export function headline(estimate: Estimate, financing: Financing): Headline {
   const before = estimate.newHomeValue == null ? null : estimate.newHomeValue - estimate.blendedUplift;
+  const refi = refinanceAfterBuild(financing, estimate.blendedUplift);
   return {
     invest: estimate.total,
     valueAdded: estimate.blendedUplift,
@@ -67,6 +72,15 @@ export function headline(estimate: Estimate, financing: Financing): Headline {
     longTerm: estimate.scenarios.longTerm.monthlyNet - financing.monthlyDebt,
     shortTerm: estimate.scenarios.shortTerm.monthlyNet - financing.monthlyDebt,
     funding: fundingLine(financing),
+    // Only promoted when it actually lowers the payments.
+    afterRefinance: refi && refi.monthlySavings > 0
+      ? {
+          monthlyDebt: refi.monthlyDebt,
+          longTerm: estimate.scenarios.longTerm.monthlyNet - refi.monthlyDebt,
+          shortTerm: estimate.scenarios.shortTerm.monthlyNet - refi.monthlyDebt,
+          savings: refi.monthlySavings,
+        }
+      : null,
   };
 }
 
@@ -148,6 +162,7 @@ export function breakdownSteps(estimate: Estimate, financing: Financing): Breakd
       result: refinance ? `${formatMoney(financing.monthlyDebt)} / mo in loans` : "Cash, no loan payments",
       lines: refinance
         ? [
+            ...(financing.cashDown > 0 ? [{ label: "Cash you put in", math: "Paid first, before borrowing", value: formatMoney(financing.cashDown) }] : []),
             {
               label: "Cash-out refinance",
               math: `New ${formatMoney(financing.newLoan)} loan at ${pct(financing.refiRate, 2)}, ${FINANCING.refiYears} years, up to ${pct(FINANCING.maxLoanToValue)} of value`,
@@ -158,7 +173,9 @@ export function breakdownSteps(estimate: Estimate, financing: Financing): Breakd
               math: `${pct(financing.unsecuredRate, 2)} for ${financing.unsecuredYears} years, up to ${formatMoney(FINANCING.unsecuredMax)}`,
               value: formatMoney(financing.unsecuredAmount),
             },
-            { label: "From savings", value: formatMoney(financing.cashFromOwner) },
+            ...(financing.cashFromOwner > financing.cashDown
+              ? [{ label: "More from savings", math: "What the loans don't cover", value: formatMoney(financing.cashFromOwner - financing.cashDown) }]
+              : []),
             {
               label: "Added mortgage payment",
               math: `${formatMoney(financing.currentPayment)}${financing.currentPaymentEstimated ? " (est.)" : ""} today → ${formatMoney(financing.newPayment)}`,
@@ -174,7 +191,7 @@ export function breakdownSteps(estimate: Estimate, financing: Financing): Breakd
     },
     {
       n: "5",
-      title: "What you keep each month",
+      title: refinance && financing.unsecuredAmount > 0 ? "Until the refinance" : "What you keep each month",
       result: `${formatMoney(longTerm.monthlyNet - financing.monthlyDebt)} or ${formatMoney(shortTerm.monthlyNet - financing.monthlyDebt)}`,
       lines: [
         { label: "Long-term lease", math: `${formatMoney(longTerm.monthlyNet)} net − ${formatMoney(financing.monthlyDebt)} loans`, value: perMonth(longTerm.monthlyNet - financing.monthlyDebt), strong: true },
@@ -182,7 +199,36 @@ export function breakdownSteps(estimate: Estimate, financing: Financing): Breakd
       ],
     },
   ];
+  const refi = refinanceAfterBuild(financing, estimate.blendedUplift);
+  if (refi) steps.push(refinanceStep(refi, financing, estimate));
   return steps;
+}
+
+function refinanceStep(refi: RefinanceAfter, financing: Financing, estimate: Estimate): BreakdownStep {
+  const { longTerm, shortTerm } = estimate.scenarios;
+  return {
+    n: "6",
+    title: "Refinance once it's built",
+    result: refi.monthlySavings > 0 ? `Saves ${formatMoney(refi.monthlySavings)} / mo` : `Costs ${formatMoney(-refi.monthlySavings)} more / mo`,
+    lines: [
+      { label: "Appraised with the ADU", math: `${formatMoney(financing.homeValue)} + ${formatMoney(estimate.blendedUplift)} value added`, value: formatMoney(refi.appraisedValue) },
+      {
+        label: "New mortgage",
+        math: `${formatMoney(financing.newLoan)} + ${formatMoney(refi.unsecuredPaidOff)} unsecured + ${pct(FINANCING.closingCostRate)} closing, up to ${formatMoney(refi.maxLoan)}`,
+        value: formatMoney(refi.newLoan),
+      },
+      { label: "Unsecured loan paid off", math: `Was ${pct(financing.unsecuredRate, 2)}, now ${pct(financing.refiRate, 2)}`, value: formatMoney(refi.unsecuredPaidOff) },
+      ...(refi.unsecuredLeft > 0 ? [{ label: "Unsecured loan left", math: `${formatMoney(refi.unsecuredPayment)} / mo`, value: formatMoney(refi.unsecuredLeft) }] : []),
+      { label: "Mortgage payment", math: `${formatMoney(financing.currentPayment)} today → ${formatMoney(refi.newPayment)}, ${FINANCING.refiYears} years`, value: perMonth(refi.newPayment) },
+      { label: "Added loan payments", math: `Was ${formatMoney(financing.monthlyDebt)} / mo`, value: perMonth(refi.monthlyDebt), strong: true },
+      { label: "You keep, lease", math: `${formatMoney(longTerm.monthlyNet)} net − ${formatMoney(refi.monthlyDebt)} loans`, value: perMonth(longTerm.monthlyNet - refi.monthlyDebt), strong: true },
+      { label: "You keep, short-term", math: `${formatMoney(shortTerm.monthlyNet)} net − ${formatMoney(refi.monthlyDebt)} loans`, value: perMonth(shortTerm.monthlyNet - refi.monthlyDebt), strong: true },
+    ],
+    note:
+      refi.monthlySavings > 0
+        ? `Once the ADU is finished, the lender appraises the home with it. The higher value lets one mortgage absorb the unsecured loan at the mortgage rate, about ${formatMoney(refi.interestSavedYearOne)} less interest the first year. Assumes today's rates and an appraisal close to this estimate.`
+        : `Once the ADU is finished, the lender appraises the home with it. Here the closing costs on a new ${formatMoney(refi.newLoan)} mortgage outweigh the lower rate, so keeping the personal loan is cheaper. A bigger value gain, a smaller mortgage, or a lower rate changes that.`,
+  };
 }
 
 /** The settings behind the numbers, as short chips. */

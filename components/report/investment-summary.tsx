@@ -43,6 +43,14 @@ export function InvestmentSummary({ estimate, summary }: { estimate: Estimate; s
         <strong className="font-semibold text-[#7fd6a8]">{formatMoney(summary.valueAdded)} more</strong>. Rented out, it would leave you{" "}
         <strong className={`font-semibold ${flowTone(summary.longTerm)}`}>{formatMoney(summary.longTerm)}</strong> a month on a lease, or{" "}
         <strong className={`font-semibold ${flowTone(summary.shortTerm)}`}>{formatMoney(summary.shortTerm)}</strong> as a short-term rental, {after}.
+        {summary.afterRefinance ? (
+          <>
+            {" "}
+            Once it&apos;s built, refinancing the loan into the mortgage raises that to{" "}
+            <strong className={`font-semibold ${flowTone(summary.afterRefinance.longTerm)}`}>{formatMoney(summary.afterRefinance.longTerm)}</strong> and{" "}
+            <strong className={`font-semibold ${flowTone(summary.afterRefinance.shortTerm)}`}>{formatMoney(summary.afterRefinance.shortTerm)}</strong>.
+          </>
+        ) : null}
       </p>
 
       <div className="mt-6 grid gap-3 md:grid-cols-[1fr_auto_1fr_auto_1.15fr] md:gap-2">
@@ -83,6 +91,18 @@ export function InvestmentSummary({ estimate, summary }: { estimate: Estimate; s
           <p className="mt-2 text-sm leading-5 text-white/65">
             {summary.financed ? `Net rent minus ${formatMoney(summary.monthlyDebt)} a month in loan payments` : "Net rent, paid in cash"}
           </p>
+          {summary.afterRefinance ? (
+            <div className="mt-3 border-t border-white/15 pt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">After the refinance</p>
+              <p className="mt-1 text-sm leading-5 text-white/80">
+                <span className={`font-semibold tabular-nums ${flowTone(summary.afterRefinance.longTerm)}`}>{formatMoney(summary.afterRefinance.longTerm)}</span> lease ·{" "}
+                <span className={`font-semibold tabular-nums ${flowTone(summary.afterRefinance.shortTerm)}`}>{formatMoney(summary.afterRefinance.shortTerm)}</span> short-term
+              </p>
+              <p className="mt-1 text-xs leading-5 text-white/55">
+                The reappraised home pays off the unsecured loan at the mortgage rate: {formatMoney(summary.afterRefinance.savings)} less a month.
+              </p>
+            </div>
+          ) : null}
         </Block>
       </div>
     </div>

@@ -317,7 +317,7 @@ export function AnalysisSection({
                     : analysis.rentPending
                       ? "Checking rent comps for this size…"
                       : analysis.rentSource === "rentcast"
-                        ? `RentCast comps for a ${analysis.snapped.toLocaleString("en-US")} sqft unit.`
+                        ? `RentCast comps for an ${ASSUMPTIONS.rent.reference.sqft} sqft, ${ASSUMPTIONS.rent.reference.bedrooms}-bedroom unit here, scaled to ${analysis.snapped.toLocaleString("en-US")} sqft.`
                         : "Los Angeles planning rate. Type over it if you know the rent.")}
               </p>
               {analysis.rentOverride !== null ? (

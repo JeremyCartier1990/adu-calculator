@@ -104,8 +104,14 @@ export const ASSUMPTIONS = {
     /** Shown as a range around the planning rate when RentCast isn't used. */
     fallbackRange: 0.12,
     debounceMs: 800,
-    /** One RentCast rent call per 50 sqft step, not per slider tick. */
+    /** Sizes snap to 50 sqft steps. */
     snapSqft: 50,
+    /**
+     * RentCast and AirROI are each asked once per address, about this unit;
+     * other sizes are scaled from it with the planning rates' shape, so changing
+     * the ADU size never buys a second lookup.
+     */
+    reference: { sqft: 800, bedrooms: 2 },
     bathrooms: 1,
     propertyType: "Apartment",
     compCount: 5,
