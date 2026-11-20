@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { validateAddress } from "@/lib/address";
+import { hasTeamAccess } from "@/lib/admin-auth";
 import { clientIp, RATE_LIMITS, takeToken } from "@/lib/rate-limit";
 import {
   hasFreshRentCastCache,
@@ -26,7 +28,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const record = body as { address?: unknown; squareFootage?: unknown; bedrooms?: unknown };
-  const parsed = validateAddress(record.address);
+  const parsed = validateAddress(record.address, { californiaOnly: !hasTeamAccess(await cookies()) });
   if (!parsed.ok) {
     return json({ ok: false, code: "bad_address", message: parsed.message }, 400);
   }

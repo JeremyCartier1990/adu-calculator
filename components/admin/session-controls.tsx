@@ -3,7 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function AdminLogin() {
+export function AdminLogin({
+  endpoint = "/api/admin/session",
+  title = "Team sign-in",
+  subtitle = "Leads and saved ADU reports.",
+  label = "Password",
+}: {
+  endpoint?: string;
+  title?: string;
+  subtitle?: string;
+  label?: string;
+}) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -17,7 +27,7 @@ export function AdminLogin() {
         setPending(true);
         setMessage(null);
         try {
-          const response = await fetch("/api/admin/session", {
+          const response = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ password }),
@@ -32,10 +42,10 @@ export function AdminLogin() {
         }
       }}
     >
-      <h1 className="font-display text-3xl">Team sign-in</h1>
-      <p className="mt-2 text-sm text-ink-soft">Leads and saved ADU reports.</p>
+      <h1 className="font-display text-3xl">{title}</h1>
+      <p className="mt-2 text-sm text-ink-soft">{subtitle}</p>
       <label className="mt-6 block">
-        <span className="text-sm font-medium">Password</span>
+        <span className="text-sm font-medium">{label}</span>
         <input
           type="password"
           autoComplete="current-password"
@@ -60,13 +70,13 @@ export function AdminLogin() {
   );
 }
 
-export function SignOut() {
+export function SignOut({ endpoint = "/api/admin/session" }: { endpoint?: string }) {
   const router = useRouter();
   return (
     <button
       type="button"
       onClick={async () => {
-        await fetch("/api/admin/session", { method: "DELETE" });
+        await fetch(endpoint, { method: "DELETE" });
         router.refresh();
       }}
       className="text-sm font-medium text-ink-soft hover:text-ink"

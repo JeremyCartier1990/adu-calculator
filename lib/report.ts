@@ -1,7 +1,10 @@
-import { ASSUMPTIONS, type FinishLevelId, type ProjectTypeId } from "./assumptions";
-import type { EstimateInput, RentSource, RentalUse } from "./calculate";
+import { ASSUMPTIONS, normalizeFinish, type ProjectTypeId } from "./assumptions";
+import { calculateEstimate, type Estimate, type EstimateInput, type RentSource, type RentalUse } from "./calculate";
+import { validateAddress } from "./address";
 import { cleanText } from "./lead";
 import type { PropertyFinancials } from "./propertyreach";
+import { parseFootprint, type LatLng } from "./footprint";
+import { parseFinancingInputs, type FinancingInputs } from "./financing";
 
 /** Property facts the homeowner confirmed (or typed) before seeing the analysis. */
 export type ConfirmedProperty = {
@@ -21,7 +24,12 @@ export type ConfirmedProperty = {
 };
 
 /** What the homeowner picked in the calculator; the estimate is recomputed from this on the server. */
-export type ReportInputs = EstimateInput;
+export type ReportInputs = EstimateInput & {
+  /** Where the ADU goes on the lot, drawn on the satellite map. */
+  footprint?: LatLng[] | null;
+  /** How the homeowner plans to pay: cash, or a refinance plus an unsecured loan. */
+  financing?: FinancingInputs | null;
+};
 
 export type ReportRecord = {
   id: string;
@@ -36,10 +44,11 @@ export type ReportRecord = {
   inputs: ReportInputs | null;
   /** Mortgage and equity from PropertyReach, for the team only; filled in shortly after the report is created. */
   financials: PropertyFinancials | null;
+  /** "team" when built in the private team builder, which skips the lead form and phone check. */
+  createdBy: "homeowner" | "team";
 };
 
 const PROJECTS = new Set<ProjectTypeId>(["garage_conversion", "attached_adu", "detached_adu"]);
-const FINISHES = new Set<FinishLevelId>(["standard", "premium", "luxury"]);
 const RENT_SOURCES = new Set<RentSource>(["rentcast", "assumption", "manual"]);
 const FACT_KEYS = ["squareFootage", "lotSize", "bedrooms", "bathrooms", "yearBuilt", "propertyType", "homeValue"];
 
@@ -54,11 +63,12 @@ function bounded(value: unknown, min: number, max: number): number | null {
   return value;
 }
 
-export function parseConfirmedProperty(input: unknown): ConfirmedProperty | null {
+/** `californiaOnly` is false for the team builder, which takes any US address. */
+export function parseConfirmedProperty(input: unknown, { californiaOnly = true }: { californiaOnly?: boolean } = {}): ConfirmedProperty | null {
   const data = record(input);
   if (!data) return null;
   const address = typeof data.address === "string" ? cleanText(data.address, 160) : "";
-  if (address.length < 8 || !/\d/.test(address) || !/\p{L}/u.test(address)) return null;
+  if (!validateAddress(address, { californiaOnly }).ok) return null;
   const edited = Array.isArray(data.edited) ? data.edited.filter((key): key is string => FACT_KEYS.includes(key as string)) : [];
   return {
     address,
@@ -76,13 +86,36 @@ export function parseConfirmedProperty(input: unknown): ConfirmedProperty | null
   };
 }
 
+/** The property facts that can be changed after the report is created. */
+export type PropertyFacts = Pick<ConfirmedProperty, "squareFootage" | "lotSize" | "bedrooms" | "bathrooms" | "yearBuilt" | "homeValue">;
+
+export function parsePropertyFacts(input: unknown): PropertyFacts | null {
+  const data = record(input);
+  if (!data) return null;
+  return {
+    squareFootage: bounded(data.squareFootage, 100, 50000),
+    lotSize: bounded(data.lotSize, 100, 5000000),
+    bedrooms: bounded(data.bedrooms, 0, 20),
+    bathrooms: bounded(data.bathrooms, 0, 20),
+    yearBuilt: bounded(data.yearBuilt, 1800, 2100),
+    homeValue: bounded(data.homeValue, 10000, 100000000),
+  };
+}
+
+/** The property with new facts; any fact that changes joins the edited list. */
+export function withPropertyFacts(property: ConfirmedProperty, facts: PropertyFacts): ConfirmedProperty {
+  const changed = (Object.keys(facts) as Array<keyof PropertyFacts>).filter((key) => facts[key] !== property[key]);
+  if (changed.length === 0) return property;
+  return { ...property, ...facts, edited: [...new Set([...property.edited, ...changed])] };
+}
+
 export function parseReportInputs(input: unknown): ReportInputs | null {
   const data = record(input);
   if (!data) return null;
   const projectType = data.projectType as ProjectTypeId;
-  const finish = data.finish as FinishLevelId;
+  const finish = normalizeFinish(data.finish);
   const rentSource = data.rentSource as RentSource;
-  if (!PROJECTS.has(projectType) || !FINISHES.has(finish) || !RENT_SOURCES.has(rentSource)) return null;
+  if (!PROJECTS.has(projectType) || !finish || !RENT_SOURCES.has(rentSource)) return null;
   const sqft = bounded(data.sqft, ASSUMPTIONS.size.min, ASSUMPTIONS.size.max);
   const monthlyRent = bounded(data.monthlyRent, 1, 100000);
   if (sqft == null || monthlyRent == null) return null;
@@ -101,7 +134,17 @@ export function parseReportInputs(input: unknown): ReportInputs | null {
     rentalUse,
     strOccupancy: bounded(data.strOccupancy, 0.05, 1),
     strNightlyRate: bounded(data.strNightlyRate, 1, 20000),
+    footprint: parseFootprint(data.footprint),
+    financing: parseFinancingInputs(data.financing),
   };
+}
+
+/**
+ * Both rentals are always shown side by side, so there's no choice to make. The
+ * value estimate uses the long-term lease, the way an appraiser would.
+ */
+export function estimateReport(inputs: ReportInputs): Estimate {
+  return calculateEstimate({ ...inputs, finish: normalizeFinish(inputs.finish) ?? "standard", rentalUse: "long_term" });
 }
 
 /** Annual net income over all-in project cost. */

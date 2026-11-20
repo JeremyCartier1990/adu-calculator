@@ -4,7 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { neon } from "@neondatabase/serverless";
-import type { ConfirmedProperty, ReportInputs, ReportRecord } from "./report";
+import { withPropertyFacts, type ConfirmedProperty, type PropertyFacts, type ReportInputs, type ReportRecord } from "./report";
 import { fetchPropertyFinancials, type PropertyFinancials } from "./propertyreach";
 
 /**
@@ -17,6 +17,7 @@ type NewReport = Omit<ReportRecord, "id" | "createdAt" | "updatedAt" | "inputs" 
 type Store = {
   create(report: ReportRecord, editHash: string): Promise<void>;
   setInputs(id: string, inputs: ReportInputs): Promise<boolean>;
+  setProperty(id: string, property: ConfirmedProperty): Promise<void>;
   setFinancials(id: string, financials: PropertyFinancials): Promise<void>;
   setEditHash(id: string, editHash: string): Promise<void>;
   setEmail(id: string, email: string): Promise<void>;
@@ -65,7 +66,8 @@ function postgresStore(url: string): Store {
       )
     `
       .then(() => sql`alter table adu_reports add column if not exists financials jsonb`)
-      .then(() => sql`alter table adu_reports alter column email drop not null`));
+      .then(() => sql`alter table adu_reports alter column email drop not null`)
+      .then(() => sql`alter table adu_reports add column if not exists created_by text not null default 'homeowner'`));
 
   type Row = {
     id: string;
@@ -79,6 +81,7 @@ function postgresStore(url: string): Store {
     property: ConfirmedProperty;
     inputs: ReportInputs | null;
     financials: PropertyFinancials | null;
+    created_by: string | null;
   };
   const toReport = (row: Row): ReportRecord => ({
     id: row.id,
@@ -91,15 +94,16 @@ function postgresStore(url: string): Store {
     property: row.property,
     inputs: row.inputs,
     financials: row.financials ?? null,
+    createdBy: row.created_by === "team" ? "team" : "homeowner",
   });
 
   return {
     async create(report, editHash) {
       await migrate();
       await sql`
-        insert into adu_reports (id, edit_hash, created_at, updated_at, name, email, phone, phone_verified, property)
+        insert into adu_reports (id, edit_hash, created_at, updated_at, name, email, phone, phone_verified, property, created_by)
         values (${report.id}, ${editHash}, ${report.createdAt}, ${report.updatedAt}, ${report.name}, ${report.email},
-                ${report.phone}, ${report.phoneVerified}, ${JSON.stringify(report.property)}::jsonb)
+                ${report.phone}, ${report.phoneVerified}, ${JSON.stringify(report.property)}::jsonb, ${report.createdBy})
       `;
     },
     async setInputs(id, inputs) {
@@ -109,6 +113,10 @@ function postgresStore(url: string): Store {
         where id = ${id} returning id
       `;
       return rows.length > 0;
+    },
+    async setProperty(id, property) {
+      await migrate();
+      await sql`update adu_reports set property = ${JSON.stringify(property)}::jsonb, updated_at = now() where id = ${id}`;
     },
     async setFinancials(id, financials) {
       await migrate();
@@ -124,7 +132,7 @@ function postgresStore(url: string): Store {
     },
     async findByPhone(phone) {
       await migrate();
-      const rows = (await sql`select * from adu_reports where phone = ${phone} order by created_at limit 1`) as Row[];
+      const rows = (await sql`select * from adu_reports where phone = ${phone} and created_by <> 'team' order by created_at limit 1`) as Row[];
       return rows[0] ? toReport(rows[0]) : null;
     },
     async get(id) {
@@ -138,6 +146,11 @@ function postgresStore(url: string): Store {
       return rows.map(toReport);
     },
   };
+}
+
+/** Reports saved before a field existed get its default. */
+function withDefaults(report: ReportRecord): ReportRecord {
+  return { ...report, financials: report.financials ?? null, createdBy: report.createdBy ?? "homeowner" };
 }
 
 function fileStore(): Store {
@@ -168,6 +181,12 @@ function fileStore(): Store {
       await save(data);
       return true;
     },
+    async setProperty(id, property) {
+      const data = await load();
+      if (!data[id]) return;
+      data[id].report = { ...data[id].report, property, updatedAt: new Date().toISOString() };
+      await save(data);
+    },
     async setFinancials(id, financials) {
       const data = await load();
       const entry = data[id];
@@ -190,17 +209,17 @@ function fileStore(): Store {
     async findByPhone(phone) {
       const first = Object.values(await load())
         .map((entry) => entry.report)
-        .filter((report) => report.phone === phone)
+        .filter((report) => report.phone === phone && report.createdBy !== "team")
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
-      return first ? { ...first, financials: first.financials ?? null } : null;
+      return first ? withDefaults(first) : null;
     },
     async get(id) {
       const entry = (await load())[id];
-      return entry ? { ...entry, report: { ...entry.report, financials: entry.report.financials ?? null } } : null;
+      return entry ? { ...entry, report: withDefaults(entry.report) } : null;
     },
     async list(limit) {
       return Object.values(await load())
-        .map((entry) => ({ ...entry.report, financials: entry.report.financials ?? null }))
+        .map((entry) => withDefaults(entry.report))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, limit);
     },
@@ -246,10 +265,19 @@ export async function saveReportEmail(id: string, editKey: string, email: string
   return { ...found.report, email };
 }
 
-export async function saveReportInputs(id: string, editKey: string, inputs: ReportInputs): Promise<"saved" | "not_found" | "forbidden"> {
+export async function saveReportInputs(
+  id: string,
+  editKey: string,
+  inputs: ReportInputs,
+  facts: PropertyFacts | null = null,
+): Promise<"saved" | "not_found" | "forbidden"> {
   const found = await getStore().get(id);
   if (!found) return "not_found";
   if (!editKeyMatches(editKey, found.editHash)) return "forbidden";
+  if (facts) {
+    const property = withPropertyFacts(found.report.property, facts);
+    if (property !== found.report.property) await getStore().setProperty(id, property);
+  }
   await getStore().setInputs(id, inputs);
   return "saved";
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AdminLogin, SignOut } from "@/components/admin/session-controls";
@@ -7,9 +8,8 @@ import { Logo } from "@/components/brand";
 import { formatDate } from "@/components/report/report-view";
 import { ADMIN_COOKIE_NAME, adminConfigured, isAdminToken } from "@/lib/admin-auth";
 import { projectTitle } from "@/lib/assumptions";
-import { calculateEstimate } from "@/lib/calculate";
 import { formatMoney } from "@/lib/money";
-import { cashOnCash, formatPercent } from "@/lib/report";
+import { cashOnCash, estimateReport, formatPercent } from "@/lib/report";
 import { listReports } from "@/lib/report-store";
 
 export const metadata: Metadata = {
@@ -18,6 +18,8 @@ export const metadata: Metadata = {
 };
 
 async function Leads() {
+  // Session checks read the clock, so this renders per request.
+  await connection();
   const cookieStore = await cookies();
   if (!adminConfigured()) {
     return <p className="mx-auto mt-16 max-w-md text-center text-sm text-ink-soft">Set ADMIN_PASSWORD (10+ characters) to enable this dashboard.</p>;
@@ -50,13 +52,17 @@ async function Leads() {
           </thead>
           <tbody>
             {reports.map((report) => {
-              const estimate = report.inputs ? calculateEstimate(report.inputs) : null;
-              const active = estimate ? (estimate.rentalUse === "short_term" ? estimate.scenarios.shortTerm : estimate.scenarios.longTerm) : null;
+              const estimate = report.inputs ? estimateReport(report.inputs) : null;
               return (
                 <tr key={report.id} className="border-t border-line align-top">
                   <td className="whitespace-nowrap px-4 py-3 text-ink-soft">{formatDate(report.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <p className="font-medium">{report.name}</p>
+                    <p className="font-medium">
+                      {report.name}
+                      {report.createdBy === "team" ? (
+                        <span className="ml-2 rounded bg-ink/[0.06] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">Team</span>
+                      ) : null}
+                    </p>
                     {report.email ? (
                       <p className="text-ink-soft">
                         <a href={`mailto:${report.email}`} className="hover:underline">
@@ -64,12 +70,14 @@ async function Leads() {
                         </a>
                       </p>
                     ) : null}
-                    <p className="text-ink-soft">
-                      <a href={`tel:${report.phone}`} className="hover:underline">
-                        {report.phone}
-                      </a>
-                      {report.phoneVerified ? <span className="ml-1.5 text-good">✓ verified</span> : null}
-                    </p>
+                    {report.phone ? (
+                      <p className="text-ink-soft">
+                        <a href={`tel:${report.phone}`} className="hover:underline">
+                          {report.phone}
+                        </a>
+                        {report.phoneVerified ? <span className="ml-1.5 text-good">✓ verified</span> : null}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="max-w-[260px] px-4 py-3">{report.property.address}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums">
@@ -90,10 +98,10 @@ async function Leads() {
                   </td>
                   <td className="px-4 py-3 tabular-nums">{estimate ? formatMoney(estimate.total) : "—"}</td>
                   <td className="px-4 py-3 tabular-nums">
-                    {active ? formatMoney(active.monthlyNet) : "—"}
-                    {active ? <span className="block text-xs text-ink-soft">{active.id === "short_term" ? "Short-term" : "Long-term"}</span> : null}
+                    {estimate ? formatMoney(estimate.scenarios.longTerm.monthlyNet) : "—"}
+                    {estimate ? <span className="block text-xs text-ink-soft">Short-term {formatMoney(estimate.scenarios.shortTerm.monthlyNet)}</span> : null}
                   </td>
-                  <td className="px-4 py-3 tabular-nums">{estimate && active ? formatPercent(cashOnCash(active.annualNet, estimate.total)) : "—"}</td>
+                  <td className="px-4 py-3 tabular-nums">{estimate ? formatPercent(cashOnCash(estimate.scenarios.longTerm.annualNet, estimate.total)) : "—"}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <Link href={`/r/${report.id}`} className="font-medium text-pine hover:underline">
                       Open report

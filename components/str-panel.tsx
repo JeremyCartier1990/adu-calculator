@@ -21,6 +21,7 @@ type StatusResponse = {
   airroi: boolean;
   verified: boolean;
   phone: string | null;
+  team?: boolean;
 };
 
 export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVerifiedPhone }: StrPanelProps) {
@@ -53,8 +54,10 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
     };
   }, [onVerifiedPhone]);
 
+  const allowed = Boolean(status?.airroi && (status.verified || status.team));
+
   useEffect(() => {
-    if (!status?.verified || latitude == null || longitude == null) return;
+    if (!allowed || latitude == null || longitude == null) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       void fetch("/api/str", {
@@ -95,7 +98,7 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
       clearTimeout(timer);
       controller.abort();
     };
-  }, [bedrooms, latitude, longitude, onMarketNumbers, status?.verified]);
+  }, [allowed, bedrooms, latitude, longitude, onMarketNumbers]);
 
   async function sendCode() {
     setPending(true);
@@ -146,13 +149,21 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
     }
   }
 
-  const shownMarket = status?.verified && latitude != null && longitude != null ? market : null;
+  const shownMarket = allowed && latitude != null && longitude != null ? market : null;
 
   return (
     <div className="mt-4 rounded-lg border border-line bg-paper px-3 py-3">
       <p className="text-sm font-medium">Nearby short-term data</p>
       {status == null ? (
         <p className="mt-1 text-sm text-ink-soft">Checking verification…</p>
+      ) : !status.airroi ? (
+        <p className="mt-1 text-sm leading-6 text-ink-soft">
+          AirROI isn&apos;t connected in this environment, so the nightly rate and occupancy are planning estimates.
+        </p>
+      ) : allowed ? (
+        <p className="mt-1 text-sm leading-6 text-ink-soft">
+          {status.verified ? `Verified ${status.phone}.` : "Team access: AirROI comps load for this address."}
+        </p>
       ) : !status.twilio ? (
         <p className="mt-1 text-sm leading-6 text-ink-soft">
           Text verification is not connected in this environment, so the nightly figure stays a planning estimate.
@@ -209,9 +220,7 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
             ) : null}
           </div>
         </div>
-      ) : (
-        <p className="mt-1 text-sm leading-6 text-ink-soft">Verified {status.phone}.</p>
-      )}
+      ) : null}
       {latitude == null || longitude == null ? (
         <p className="mt-2 text-sm leading-6 text-ink-soft">
           A property lookup with a map point is required before a paid short-term search. The sample preview does not spend that credit.

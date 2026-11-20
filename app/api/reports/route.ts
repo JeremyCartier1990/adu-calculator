@@ -99,6 +99,7 @@ export async function POST(request: Request): Promise<Response> {
       phone: lead.lead.phone,
       phoneVerified,
       property,
+      createdBy: "homeowner",
     });
     // One PropertyReach credit per lead, after the response so the homeowner never waits on it.
     after(() => attachFinancials(report));

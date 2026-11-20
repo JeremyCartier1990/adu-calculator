@@ -15,7 +15,7 @@ const noSubscribe = () => () => {};
  * live calculator with their saved settings; anyone else sees `children`, the
  * read-only report rendered on the server.
  */
-export function ReportOwner({ report, children }: { report: OwnedReport; children: React.ReactNode }) {
+export function ReportOwner({ report, team = false, children }: { report: OwnedReport; team?: boolean; children: React.ReactNode }) {
   const editKey = useSyncExternalStore(
     noSubscribe,
     () => readEditKey(report.id),
@@ -29,6 +29,7 @@ export function ReportOwner({ report, children }: { report: OwnedReport; childre
       saveNote={null}
       saved={report.inputs}
       onReportPage
+      team={team}
     />
   );
 }

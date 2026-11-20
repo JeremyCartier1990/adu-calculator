@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { Logo } from "@/components/brand";
 import { ReportOwner } from "@/components/report/report-owner";
 import { ReportView } from "@/components/report/report-view";
-import { ADMIN_COOKIE_NAME, isAdminToken } from "@/lib/admin-auth";
+import { ADMIN_COOKIE_NAME, hasTeamAccess, isAdminToken } from "@/lib/admin-auth";
 import { getReport } from "@/lib/report-store";
 
 export const metadata: Metadata = {
@@ -21,7 +21,7 @@ async function Report({ params }: { params: Promise<{ id: string }> }) {
   const showContact = isAdminToken(cookieStore.get(ADMIN_COOKIE_NAME)?.value);
   const view = <ReportView report={report} showContact={showContact} />;
   // The team's view always stays read-only, with the lead's contact details.
-  return showContact ? view : <ReportOwner report={{ id: report.id, property: report.property, inputs: report.inputs }}>{view}</ReportOwner>;
+  return showContact ? view : <ReportOwner report={{ id: report.id, property: report.property, inputs: report.inputs }} team={hasTeamAccess(cookieStore)}>{view}</ReportOwner>;
 }
 
 export default function ReportPage({ params }: PageProps<"/r/[id]">) {

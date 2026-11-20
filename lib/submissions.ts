@@ -12,7 +12,8 @@ export type SubmissionOutcome =
   | "invalid"
   | "verification_required"
   | "store_missing"
-  | "pdf_email";
+  | "pdf_email"
+  | "team_created";
 
 export type Submission = {
   outcome: SubmissionOutcome;

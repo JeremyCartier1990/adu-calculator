@@ -17,7 +17,7 @@ const METRICS = [
   {
     title: "All-in build cost",
     text: "Every line from plans to final inspection, priced at current Los Angeles rates for your ADU type and finish.",
-    tags: ["Construction", "Architectural plans", "City permits", "School & impact fees", "Utility connections"],
+    tags: ["Construction", "Architectural plans", "City permits"],
   },
   {
     title: "Rent from real comps",

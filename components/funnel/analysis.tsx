@@ -2,15 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowBox, Eyebrow } from "@/components/eyebrow";
+import { FinancingSection } from "@/components/funnel/financing-section";
+import { FACT_FIELDS } from "@/components/funnel/shared";
 import { useAnalysis } from "@/components/funnel/use-analysis";
-import { EmailPdf } from "@/components/report/email-pdf";
-import { Kpi, KpiBand } from "@/components/report/kpi";
-import { PropertyMap } from "@/components/report/property-map";
+import { CalculationBreakdown } from "@/components/report/calculation-breakdown";
+import { InvestmentSummary, projectPhrase } from "@/components/report/investment-summary";
+import { LotMap, requestLotDrawing } from "@/components/report/lot-map";
 import { ResultsPanel } from "@/components/results-panel";
-import { ASSUMPTIONS, bedroomLabel, FINISH_LEVELS, PROJECT_TYPES } from "@/lib/assumptions";
+import { ASSUMPTIONS, bedroomLabel, FINISH_LEVELS, PROJECT_TYPES, projectTitle } from "@/lib/assumptions";
 import { BRAND } from "@/lib/brand";
-import { formatMoney, formatYears } from "@/lib/money";
-import { cashOnCash, formatPercent, type ConfirmedProperty, type ReportInputs } from "@/lib/report";
+import { BEST_SETUP_YEARS } from "@/lib/optimize";
+import { breakdownSteps, financingFor, headline, settingsUsed } from "@/lib/breakdown";
+import type { ConfirmedProperty, ReportInputs } from "@/lib/report";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -20,6 +23,7 @@ export function AnalysisSection({
   saveNote,
   saved = null,
   onReportPage = false,
+  team = false,
 }: {
   property: ConfirmedProperty;
   report: { id: string; editKey: string } | null;
@@ -28,13 +32,16 @@ export function AnalysisSection({
   saved?: ReportInputs | null;
   /** True on /r/[id], where "Open report" would point at the same page. */
   onReportPage?: boolean;
+  /** The team builder, which prefills the financing with the mortgage on record. */
+  team?: boolean;
 }) {
-  const analysis = useAnalysis(property, saved);
-  const { estimate, inputs } = analysis;
+  const analysis = useAnalysis(property, saved, team && report ? report.id : null);
+  const { estimate, inputs, facts } = analysis;
+  const financing = financingFor(analysis.financing.inputs, estimate);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [copied, setCopied] = useState(false);
   const savedJson = useRef<string | null>(null);
-  const inputsJson = JSON.stringify(inputs);
+  const inputsJson = JSON.stringify({ inputs, property: facts });
 
   async function save(json: string): Promise<boolean> {
     if (!report || json === savedJson.current) return true;
@@ -43,7 +50,7 @@ export function AnalysisSection({
       const response = await fetch(`/api/reports/${report.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-edit-key": report.editKey },
-        body: `{"inputs":${json}}`,
+        body: json,
       });
       if (!response.ok) throw new Error(String(response.status));
       savedJson.current = json;
@@ -66,8 +73,6 @@ export function AnalysisSection({
   // Only mounted after the homeowner finishes the funnel, so this never renders on the server.
   const origin = typeof window === "undefined" ? BRAND.url : window.location.origin;
   const reportUrl = report ? `${origin}/r/${report.id}` : null;
-  const active = estimate.rentalUse === "short_term" ? estimate.scenarios.shortTerm : estimate.scenarios.longTerm;
-  const roi = cashOnCash(active.annualNet, estimate.total);
 
   const status = report
     ? saveState === "saving"
@@ -112,7 +117,6 @@ export function AnalysisSection({
                   Download PDF
                   <ArrowBox />
                 </a>
-                <EmailPdf reportId={report.id} editKey={report.editKey} beforeSend={() => save(inputsJson)} />
                 <button
                   type="button"
                   onClick={async () => {
@@ -138,28 +142,48 @@ export function AnalysisSection({
               </div>
             ) : null}
           </div>
-          <PropertyMap
-            address={property.address}
-            latitude={property.latitude}
-            longitude={property.longitude}
-            className="m-3 mt-0 aspect-[16/10] rounded-xl lg:m-3 lg:aspect-auto lg:min-h-80 lg:w-[44%]"
-          />
         </div>
 
-        <div className="bg-ink p-3 sm:p-4">
-          <KpiBand>
-            <Kpi label="Project cost" value={formatMoney(estimate.total)} wide />
-            <Kpi label="Net income / mo" value={formatMoney(active.monthlyNet)} note={active.id === "short_term" ? "Short-term rental" : "Long-term lease"} />
-            <Kpi label="Cash-on-cash" value={formatPercent(roi)} note="Year-one net ÷ cost" />
-            <Kpi label="Payback" value={formatYears(active.breakEvenYears)} note="With rent growth" />
-            <Kpi label="Equity created" value={formatMoney(estimate.equity)} tone={estimate.equity >= 0 ? "good" : "warn"} note="Value added − cost" />
-          </KpiBand>
+        <div className="bg-ink p-5 sm:p-8 lg:p-10">
+          <InvestmentSummary estimate={estimate} summary={headline(estimate, financing)} />
+          <div className="mt-5 flex flex-col gap-3 rounded-xl border border-white/15 px-4 py-3 text-sm text-white/80 sm:flex-row sm:items-center sm:justify-between">
+            <p className="leading-6">
+              {analysis.onBest
+                ? `This is the best setup for this property: a ${projectPhrase(estimate)}, the biggest the state allows here, with the highest ${BEST_SETUP_YEARS}-year return. Change anything below.`
+                : `The best setup for this property is a ${analysis.best.sqft.toLocaleString("en-US")} sqft ${projectTitle(analysis.best.projectType).toLowerCase().replace("adu", "ADU")} with a standard finish.`}
+            </p>
+            {analysis.onBest ? null : (
+              <button
+                type="button"
+                onClick={analysis.applyBest}
+                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-ink hover:bg-white/90"
+              >
+                Use the best setup
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="grid items-start gap-8 p-4 sm:p-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-10 lg:p-10">
-          <div className="rounded-xl border border-line bg-paper p-5 sm:p-6 lg:sticky lg:top-6">
+        <div className="grid items-start gap-8 p-4 sm:p-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-10 lg:p-10">
+          <div className="min-w-0 space-y-8">
+            <CalculationBreakdown
+              steps={breakdownSteps(estimate, financing)}
+              settings={settingsUsed(estimate, financing, { homeValue: analysis.facts.homeValue, squareFootage: analysis.facts.squareFootage, lotSize: analysis.facts.lotSize })}
+              notes={estimate.notes}
+            />
+            <ResultsPanel
+              estimate={estimate}
+              usingAirroi={analysis.usingAirroi}
+              latitude={property.latitude}
+              longitude={property.longitude}
+              onMarketNumbers={analysis.onMarketNumbers}
+              onVerifiedPhone={noop}
+            />
+          </div>
+
+          <div className="rounded-xl border border-line bg-paper p-5 sm:p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line pb-4">
-              <h3 className="whitespace-nowrap font-display text-2xl text-ink">ADU settings</h3>
+              <h3 className="whitespace-nowrap font-display text-2xl text-ink">Change the numbers</h3>
               <span className="text-xs text-ink-soft">{report ? "Changes save automatically" : "Try any option"}</span>
             </div>
 
@@ -226,6 +250,23 @@ export function AnalysisSection({
                 <span className="font-medium text-ink">{bedroomLabel(analysis.beds)}</span>
                 <span>{ASSUMPTIONS.size.max.toLocaleString("en-US")} sqft</span>
               </div>
+              {analysis.projectType !== "garage_conversion" ? (
+                <button
+                  type="button"
+                  onClick={requestLotDrawing}
+                  className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-semibold text-ink transition hover:border-ink"
+                >
+                  <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 13 4 9.5 10.5 3 13 5.5 6.5 12z M9 4.5l2.5 2.5" />
+                  </svg>
+                  {analysis.footprint ? "Redraw the ADU on the map" : "Draw the ADU on the map"}
+                </button>
+              ) : null}
+              {analysis.projectType === "garage_conversion" ? (
+                <p className="mt-2 text-sm leading-6 text-ink-soft">
+                  Public records don&apos;t list garage size. Set this to the garage&apos;s floor area: about 400 sqft for two cars, 200 for one.
+                </p>
+              ) : null}
             </div>
 
             <fieldset className="mt-6">
@@ -235,7 +276,7 @@ export function AnalysisSection({
                   <label
                     key={level.id}
                     title={level.text}
-                    className={`cursor-pointer rounded-md px-3 py-2.5 text-center text-sm font-medium transition has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-ink/10 ${
+                    className={`flex min-h-11 cursor-pointer items-center justify-center rounded-md px-1 text-center text-sm font-medium transition has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-ink/10 ${
                       analysis.finish === level.id ? "bg-ink text-white" : "text-ink-soft hover:bg-paper hover:text-ink"
                     }`}
                   >
@@ -285,24 +326,111 @@ export function AnalysisSection({
                 </button>
               ) : null}
             </div>
-          </div>
 
-          <ResultsPanel
-            estimate={estimate}
-            onRentalUse={analysis.setRentalUse}
-            occupancyPercent={analysis.occupancyPercent}
-            onOccupancyPercent={analysis.setOccupancyPercent}
-            nightlyRateInput={analysis.nightlyOverride ?? String(estimate.scenarios.shortTerm.nightlyRate ?? "")}
-            onNightlyRateInput={analysis.setNightlyOverride}
-            nightlyIsCustom={analysis.nightlyOverride !== null}
-            onResetNightly={() => analysis.setNightlyOverride(null)}
-            usingAirroi={analysis.usingAirroi}
+            <fieldset className="mt-6">
+              <StepLegend n="05">Short-term rental</StepLegend>
+              <div className="mt-3 grid gap-4">
+                <div>
+                  <label htmlFor="nightly-rate" className="text-sm font-medium text-ink">
+                    Nightly rate
+                  </label>
+                  <div className="mt-1.5 flex min-h-12 items-center rounded-lg border border-line bg-white focus-within:border-ink focus-within:ring-4 focus-within:ring-ink/10">
+                    <span className="pl-3 text-ink-soft">$</span>
+                    <input
+                      id="nightly-rate"
+                      inputMode="decimal"
+                      value={analysis.nightlyOverride ?? String(estimate.scenarios.shortTerm.nightlyRate ?? "")}
+                      onChange={(event) => analysis.setNightlyOverride(event.target.value)}
+                      className="min-h-12 w-full bg-transparent px-2 text-base tabular-nums outline-none"
+                    />
+                    <span className="whitespace-nowrap pr-3 text-sm text-ink-soft">/ night</span>
+                  </div>
+                  <p className="mt-1.5 text-sm leading-6 text-ink-soft">
+                    {analysis.nightlyOverride !== null
+                      ? "Using the nightly rate you typed."
+                      : analysis.usingAirroi
+                        ? "AirROI average for similar rentals nearby."
+                        : `Estimate: ${ASSUMPTIONS.shortTerm.nightlyFromMonthlyMultiplier}× the long-term rent, spread over ${ASSUMPTIONS.shortTerm.daysPerMonth} nights.`}
+                  </p>
+                  {analysis.nightlyOverride !== null ? (
+                    <button type="button" onClick={() => analysis.setNightlyOverride(null)} className="mt-1 text-sm font-medium text-pine hover:underline">
+                      Use the estimated nightly rate
+                    </button>
+                  ) : null}
+                </div>
+                <div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <label htmlFor="occupancy" className="text-sm font-medium text-ink">
+                      Occupancy
+                    </label>
+                    <span className="font-display text-2xl tabular-nums text-ink">{analysis.occupancyPercent}%</span>
+                  </div>
+                  <input
+                    id="occupancy"
+                    type="range"
+                    min={Math.round(ASSUMPTIONS.shortTerm.occupancyMin * 100)}
+                    max={Math.round(ASSUMPTIONS.shortTerm.occupancyMax * 100)}
+                    step={1}
+                    value={analysis.occupancyPercent}
+                    aria-valuetext={`${analysis.occupancyPercent} percent of nights booked`}
+                    onChange={(event) => analysis.setOccupancyPercent(Number(event.target.value))}
+                  />
+                  <div className="flex justify-between text-xs text-ink-soft">
+                    <span>{Math.round(ASSUMPTIONS.shortTerm.occupancyMin * 100)}%</span>
+                    <span>{Math.round((analysis.occupancyPercent / 100) * ASSUMPTIONS.shortTerm.daysPerMonth)} nights a month</span>
+                    <span>{Math.round(ASSUMPTIONS.shortTerm.occupancyMax * 100)}%</span>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset className="mt-6">
+              <StepLegend n="06">Property</StepLegend>
+              <p className="mt-1.5 text-sm leading-6 text-ink-soft">From public records. Correct anything that&apos;s off; value and sizes feed the estimate.</p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                {FACT_FIELDS.map((field) => (
+                  <div key={field.key} className={field.key === "homeValue" ? "col-span-2" : undefined}>
+                    <label htmlFor={`fact-${field.key}`} className="text-sm font-medium text-ink">
+                      {field.label}
+                    </label>
+                    <div className="mt-1.5 flex min-h-12 items-center rounded-lg border border-line bg-white focus-within:border-ink focus-within:ring-4 focus-within:ring-ink/10">
+                      {field.prefix ? <span className="pl-3 text-ink-soft">{field.prefix}</span> : null}
+                      <input
+                        id={`fact-${field.key}`}
+                        inputMode="decimal"
+                        value={analysis.factDraft[field.key]}
+                        onChange={(event) => analysis.setFact(field.key, event.target.value)}
+                        placeholder="—"
+                        className={`min-h-12 w-full min-w-0 bg-transparent text-base tabular-nums outline-none ${field.prefix ? "px-2" : "px-3"}`}
+                      />
+                      {field.suffix ? <span className="whitespace-nowrap pr-3 text-sm text-ink-soft">{field.suffix}</span> : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
+        <FinancingSection state={analysis.financing} estimate={estimate} />
+
+        <div className="border-t border-line p-4 sm:p-8 lg:px-10">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h3 className="font-display text-2xl text-ink">Place the ADU on your lot</h3>
+            <p className="text-sm text-ink-soft">Satellite view · drawn sizes are approximate</p>
+          </div>
+          <LotMap
+            address={property.address}
             latitude={property.latitude}
             longitude={property.longitude}
-            onMarketNumbers={analysis.onMarketNumbers}
-            onVerifiedPhone={noop}
+            footprint={analysis.footprint}
+            onFootprint={analysis.setFootprint}
+            targetSqft={analysis.sqft}
+            onUseSqft={analysis.setSqft}
+            canPlace={analysis.projectType !== "garage_conversion"}
           />
         </div>
+
       </div>
     </section>
   );

@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { validateAddress } from "@/lib/address";
+import { hasTeamAccess } from "@/lib/admin-auth";
 import type { PropertyLookup } from "@/lib/api-types";
 import { lookupPropertyReach, propertyReachConfigured } from "@/lib/propertyreach";
 import { clientIp, RATE_LIMITS, takeToken } from "@/lib/rate-limit";
@@ -26,7 +28,7 @@ export async function POST(request: Request): Promise<Response> {
     return json({ ok: false, code: "bad_request", message: "Send a JSON body with an address." }, 400);
   }
 
-  const parsed = validateAddress((body as { address?: unknown }).address);
+  const parsed = validateAddress((body as { address?: unknown }).address, { californiaOnly: !hasTeamAccess(await cookies()) });
   if (!parsed.ok) {
     return json({ ok: false, code: "bad_address", message: parsed.message }, 400);
   }

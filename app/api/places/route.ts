@@ -1,14 +1,19 @@
+import { cookies } from "next/headers";
+import { isCaliforniaAddress } from "@/lib/address";
+import { hasTeamAccess } from "@/lib/admin-auth";
 import { clientIp, takeToken } from "@/lib/rate-limit";
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
 }
 
-// Southern California first; suggestions elsewhere in the US still appear.
-const SOCAL_BIAS = {
+// California's bounding box, for the public builder. It overlaps a little of Nevada,
+// Oregon and Arizona, so suggestions are also filtered to California by their text.
+// The team builder gets any US address, with California first.
+const CALIFORNIA = {
   rectangle: {
-    low: { latitude: 32.5, longitude: -119.5 },
-    high: { latitude: 34.9, longitude: -116.5 },
+    low: { latitude: 32.5, longitude: -124.5 },
+    high: { latitude: 42.0, longitude: -114.1 },
   },
 };
 
@@ -35,11 +40,13 @@ export async function POST(request: Request): Promise<Response> {
 
   // Keys restricted to website referrers check this header, and a server request has none of its own.
   const referer = `${new URL(request.url).origin}/`;
-  const modern = await autocompleteNew(key, referer, input, sessionToken);
-  if (modern.ok) return json({ ok: true, suggestions: modern.suggestions });
+  const californiaOnly = !hasTeamAccess(await cookies());
+  const keep = (suggestions: Suggestion[]) => (californiaOnly ? suggestions.filter((s) => isCaliforniaAddress(s.text)) : suggestions).slice(0, 5);
+  const modern = await autocompleteNew(key, referer, input, californiaOnly, sessionToken);
+  if (modern.ok) return json({ ok: true, suggestions: keep(modern.suggestions) });
   // Older keys and projects may only allow the legacy Places API.
-  const legacy = await autocompleteLegacy(key, referer, input, sessionToken);
-  if (legacy.ok) return json({ ok: true, suggestions: legacy.suggestions });
+  const legacy = await autocompleteLegacy(key, referer, input, californiaOnly, sessionToken);
+  if (legacy.ok) return json({ ok: true, suggestions: keep(legacy.suggestions) });
   console.warn(JSON.stringify({ event: "places_autocomplete", modern: modern.reason, legacy: legacy.reason }));
   return json({ ok: false, code: "upstream", reason: modern.reason, suggestions: [] });
 }
@@ -50,11 +57,10 @@ type Lookup = { ok: true; suggestions: Suggestion[] } | { ok: false; reason: str
 const tidy = (suggestions: Suggestion[]) =>
   suggestions
     .map((s) => ({ ...s, text: s.text.replace(/, USA$/, "") }))
-    .filter((s) => s.id && s.text)
-    .slice(0, 5);
+    .filter((s) => s.id && s.text);
 
 /** Places Autocomplete (New). */
-async function autocompleteNew(key: string, referer: string, input: string, sessionToken?: string): Promise<Lookup> {
+async function autocompleteNew(key: string, referer: string, input: string, californiaOnly: boolean, sessionToken?: string): Promise<Lookup> {
   const response = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
     method: "POST",
     headers: {
@@ -68,7 +74,7 @@ async function autocompleteNew(key: string, referer: string, input: string, sess
       sessionToken,
       includedRegionCodes: ["us"],
       includedPrimaryTypes: ["street_address", "premise", "subpremise"],
-      locationBias: SOCAL_BIAS,
+      ...(californiaOnly ? { locationRestriction: CALIFORNIA } : { locationBias: CALIFORNIA }),
     }),
     cache: "no-store",
   }).catch(() => null);
@@ -90,13 +96,13 @@ async function autocompleteNew(key: string, referer: string, input: string, sess
 }
 
 /** Legacy Places Autocomplete, for keys that predate Places API (New). */
-async function autocompleteLegacy(key: string, referer: string, input: string, sessionToken?: string): Promise<Lookup> {
+async function autocompleteLegacy(key: string, referer: string, input: string, californiaOnly: boolean, sessionToken?: string): Promise<Lookup> {
   const url = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
   url.searchParams.set("input", input);
   url.searchParams.set("key", key);
   url.searchParams.set("types", "address");
   url.searchParams.set("components", "country:us");
-  url.searchParams.set("locationbias", "rectangle:32.5,-119.5|34.9,-116.5");
+  url.searchParams.set(californiaOnly ? "locationrestriction" : "locationbias", "rectangle:32.5,-124.5|42.0,-114.1");
   if (sessionToken) url.searchParams.set("sessiontoken", sessionToken);
   const response = await fetch(url, { headers: { Referer: referer }, cache: "no-store" }).catch(() => null);
   if (!response) return { ok: false, reason: "network" };

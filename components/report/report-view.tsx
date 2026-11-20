@@ -1,13 +1,14 @@
 import { CashFlowChart } from "@/components/cash-flow-chart";
 import { Eyebrow } from "@/components/eyebrow";
-import { Kpi, KpiBand } from "@/components/report/kpi";
-import { PropertyMap } from "@/components/report/property-map";
-import { bedroomLabel } from "@/lib/assumptions";
+import { CalculationBreakdown } from "@/components/report/calculation-breakdown";
+import { InvestmentSummary } from "@/components/report/investment-summary";
+import { LotMap } from "@/components/report/lot-map";
 import { BRAND } from "@/lib/brand";
-import { calculateEstimate, type RentalScenario } from "@/lib/calculate";
+import { breakdownSteps, financingFor, headline, settingsUsed } from "@/lib/breakdown";
+import type { RentalScenario } from "@/lib/calculate";
 import { formatMoney, formatNumber, formatYears } from "@/lib/money";
 import type { PropertyFinancials } from "@/lib/propertyreach";
-import { cashOnCash, formatPercent, type ReportRecord } from "@/lib/report";
+import { cashOnCash, estimateReport, formatPercent, type ReportRecord } from "@/lib/report";
 
 const FACT_LABELS: Record<string, string> = {
   squareFootage: "Home size",
@@ -51,8 +52,8 @@ function Rows({ rows }: { rows: Array<[string, string, boolean?]> }) {
 /** Read-only report, rendered on the server from the saved inputs. Contact details show for the team only. */
 export function ReportView({ report, showContact }: { report: ReportRecord; showContact: boolean }) {
   const { property, inputs } = report;
-  const estimate = inputs ? calculateEstimate(inputs) : null;
-  const active = estimate ? (estimate.rentalUse === "short_term" ? estimate.scenarios.shortTerm : estimate.scenarios.longTerm) : null;
+  const estimate = inputs ? estimateReport(inputs) : null;
+  const financing = estimate ? financingFor(inputs?.financing, estimate) : null;
   const fact = (key: keyof typeof property) => {
     const value = property[key];
     if (value == null) return "—";
@@ -88,22 +89,10 @@ export function ReportView({ report, showContact }: { report: ReportRecord; show
               </span>
             </a>
           </div>
-          <PropertyMap
-            address={property.address}
-            latitude={property.latitude}
-            longitude={property.longitude}
-            className="m-3 mt-0 aspect-[16/10] lg:m-3 lg:aspect-auto lg:min-h-72 lg:w-[44%]"
-          />
         </div>
-        {estimate && active ? (
-          <div className="bg-ink p-3 sm:p-4">
-            <KpiBand>
-              <Kpi label="Project cost" value={formatMoney(estimate.total)} wide />
-              <Kpi label="Net income / mo" value={formatMoney(active.monthlyNet)} note={active.label} />
-              <Kpi label="Cash-on-cash" value={formatPercent(cashOnCash(active.annualNet, estimate.total))} note="Year-one net ÷ cost" />
-              <Kpi label="Payback" value={formatYears(active.breakEvenYears)} note="With rent growth" />
-              <Kpi label="Equity created" value={formatMoney(estimate.equity)} tone={estimate.equity >= 0 ? "good" : "warn"} note="Value added − cost" />
-            </KpiBand>
+        {estimate && financing ? (
+          <div className="bg-ink p-5 sm:p-8 lg:p-10">
+            <InvestmentSummary estimate={estimate} summary={headline(estimate, financing)} />
           </div>
         ) : null}
       </header>
@@ -114,7 +103,8 @@ export function ReportView({ report, showContact }: { report: ReportRecord; show
             rows={[
               ["Name", report.name],
               ["Email", report.email ?? "Not given"],
-              ["Phone", `${report.phone}${report.phoneVerified ? " · verified by text" : " · not verified"}`],
+              ["Phone", report.phone ? `${report.phone}${report.phoneVerified ? " · verified by text" : " · not verified"}` : "Not given"],
+              ["Created by", report.createdBy === "team" ? "Team builder" : "Homeowner"],
               ["Created", formatDate(report.createdAt)],
               ["Property data", property.source === "rentcast" ? `Public records${property.edited.length ? `, homeowner edited ${property.edited.map((key) => FACT_LABELS[key] ?? key).join(", ").toLowerCase()}` : ", confirmed as is"}` : "Entered by homeowner"],
             ]}
@@ -122,101 +112,68 @@ export function ReportView({ report, showContact }: { report: ReportRecord; show
         </Section>
       ) : null}
 
+      <Section title="Site plan">
+        <LotMap
+          address={property.address}
+          latitude={property.latitude}
+          longitude={property.longitude}
+          footprint={inputs?.footprint ?? null}
+          targetSqft={inputs?.sqft ?? 0}
+        />
+      </Section>
+
       {showContact && report.financials ? <Financials financials={report.financials} /> : null}
 
-      {estimate && active ? (
+      {estimate && financing ? (
         <>
+          <section className="rounded-xl border border-line bg-paper p-5 sm:p-6">
+            <CalculationBreakdown steps={breakdownSteps(estimate, financing)} settings={settingsUsed(estimate, financing, property)} notes={estimate.notes} />
+          </section>
+
           <div className="grid gap-5 md:grid-cols-2">
-            <Section title="Selected project" n="01">
-              <Rows
-                rows={[
-                  ["ADU type", estimate.projectLabel],
-                  ["Size", `${formatNumber(estimate.sqft)} sqft · ${bedroomLabel(estimate.bedrooms)}`],
-                  ["Finish", estimate.finishLabel],
-                  ["Rental plan", active.label],
-                  ["Long-term rent", `${formatMoney(estimate.monthlyRent)} / mo${estimate.rentSource === "manual" ? " (homeowner's figure)" : estimate.rentSource === "rentcast" ? " (RentCast comps)" : " (planning rate)"}`],
-                ]}
-              />
-            </Section>
-            <Section title="Property" n="02">
+            <Section title="Property">
               {knownFacts.length > 0 ? (
                 <Rows rows={knownFacts} />
               ) : (
                 <p className="py-2 text-sm text-ink-soft">No public records were found for this address.</p>
               )}
             </Section>
-          </div>
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <Section title="Project cost" n="03">
-              <Rows
-                rows={[
-                  ["Construction", formatMoney(estimate.construction)],
-                  ["Architectural plans", formatMoney(estimate.design)],
-                  ["City permits", formatMoney(estimate.cityFees)],
-                  ["School & impact fees", formatMoney(estimate.schoolFees)],
-                  ["Utility connections", formatMoney(estimate.utilityFees)],
-                  ["Total project cost", formatMoney(estimate.total), true],
-                ]}
-              />
-            </Section>
-            <Section title="Value & equity" n="04">
-              <Rows
-                rows={[
-                  ["Square-foot approach", formatMoney(estimate.sqftUplift)],
-                  ["Income approach", estimate.incomeUplift == null ? "—" : formatMoney(estimate.incomeUplift)],
-                  ["Blended value added", formatMoney(estimate.blendedUplift)],
-                  ["New estimated home value", estimate.newHomeValue == null ? "—" : formatMoney(estimate.newHomeValue)],
-                  ["Equity vs. cost", formatMoney(estimate.equity), true],
-                ]}
-              />
-            </Section>
-          </div>
-
-          <Section title="Rental income" n="05">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[480px] text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-ink-soft">
-                    <th className="py-2 font-medium" />
-                    {[estimate.scenarios.longTerm, estimate.scenarios.shortTerm].map((scenario) => (
-                      <th key={scenario.id} className="py-2 text-right font-medium">
-                        {scenario.label}
-                        {scenario.id === estimate.rentalUse ? " ✓" : ""}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="tabular-nums">
-                  {(
-                    [
-                      ["Gross / month", (s) => formatMoney(s.monthlyGross)],
-                      ["Net / year", (s) => formatMoney(s.annualNet)],
-                      ["Net / month", (s) => formatMoney(s.monthlyNet)],
-                      ["Cash-on-cash", (s) => formatPercent(cashOnCash(s.annualNet, estimate.total))],
-                      ["Payback with rent growth", (s) => formatYears(s.breakEvenYears)],
-                    ] as Array<[string, (s: RentalScenario) => string]>
-                  ).map(([label, value]) => (
-                    <tr key={label} className="border-t border-line">
-                      <td className="py-2 text-ink-soft">{label}</td>
-                      <td className="py-2 text-right">{value(estimate.scenarios.longTerm)}</td>
-                      <td className="py-2 text-right">{value(estimate.scenarios.shortTerm)}</td>
+            <Section title="Rental returns">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[320px] text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-ink-soft">
+                      <th className="py-2 font-medium" />
+                      <th className="py-2 text-right font-medium">Lease</th>
+                      <th className="py-2 text-right font-medium">Short-term</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-6">
-              <CashFlowChart series={active.series} breakEvenYears={active.breakEvenYears} />
-            </div>
-          </Section>
+                  </thead>
+                  <tbody className="tabular-nums">
+                    {(
+                      [
+                        ["Gross / month", (x) => formatMoney(x.monthlyGross)],
+                        ["Net / month", (x) => formatMoney(x.monthlyNet)],
+                        ["After loans / month", (x) => formatMoney(x.monthlyNet - financing.monthlyDebt)],
+                        ["Cash-on-cash", (x) => formatPercent(cashOnCash(x.annualNet, estimate.total))],
+                        ["Payback with rent growth", (x) => formatYears(x.breakEvenYears)],
+                      ] as Array<[string, (x: RentalScenario) => string]>
+                    ).map(([label, value]) => (
+                      <tr key={label} className="border-t border-line">
+                        <td className="py-2 text-ink-soft">{label}</td>
+                        <td className="py-2 text-right">{value(estimate.scenarios.longTerm)}</td>
+                        <td className="py-2 text-right">{value(estimate.scenarios.shortTerm)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          </div>
 
-          <Section title="How these numbers are calculated" n="06">
-            <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-ink-soft">
-              {estimate.notes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
+          <Section title="15-year cash flow">
+            <div className="pt-3">
+              <CashFlowChart scenarios={[estimate.scenarios.longTerm, estimate.scenarios.shortTerm]} />
+            </div>
           </Section>
         </>
       ) : (

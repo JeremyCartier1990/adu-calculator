@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ASSUMPTIONS, bedroomsForSqft, snapSqft } from "./assumptions";
+import { ASSUMPTIONS, bedroomsForSqft, normalizeFinish, snapSqft } from "./assumptions";
 import {
   calculateEstimate,
   clampOccupancy,
@@ -49,15 +49,10 @@ test("garage conversion cost sheet matches the published rates", () => {
   const construction = Math.round(400 * 265);
   const design = Math.round(4000 + 7 * 400);
   const city = Math.round(5800 + 4 * 400);
-  const school = 0;
-  const utility = 4000;
   assert.equal(estimate.construction, construction);
   assert.equal(estimate.design, design);
   assert.equal(estimate.cityFees, city);
-  assert.equal(estimate.schoolFees, school);
-  assert.equal(estimate.utilityFees, utility);
-  assert.equal(estimate.permitsAndFees, city + school + utility);
-  assert.equal(estimate.total, construction + design + city + school + utility);
+  assert.equal(estimate.total, construction + design + city);
   assert.equal(
     ASSUMPTIONS.costPerSqft.garage_conversion.standard,
     265,
@@ -66,12 +61,9 @@ test("garage conversion cost sheet matches the published rates", () => {
   assert.match(estimate.notes.join(" "), /\$265 per square foot/);
 });
 
-test("school fees start at 750 sqft and stay off below it", () => {
-  const under = calculateEstimate(input({ sqft: 740, projectType: "attached_adu" }));
-  const over = calculateEstimate(input({ sqft: 750, projectType: "attached_adu" }));
-  assert.equal(under.schoolFees, 0);
-  assert.ok(over.schoolFees > 0);
-  assert.equal(over.schoolFees, Math.round(750 * ASSUMPTIONS.permits.schoolFeePerSqft));
+test("the only fee line is city permits, at any size", () => {
+  const large = calculateEstimate(input({ sqft: 1000, projectType: "attached_adu" }));
+  assert.equal(large.total, large.construction + large.design + large.cityFees);
 });
 
 test("detached ADU on a small lot warns, and a large garage does too", () => {
@@ -144,12 +136,14 @@ test("short-term expenses come out of nightly revenue and do not call for a seco
   assert.equal(str.monthlyGross, monthly);
   assert.equal(str.annualGross, annual);
   assert.equal(str.sourceNote, "Planning estimate, not RentCast data");
-  const platform = Math.round(annual * ASSUMPTIONS.shortTerm.platformFeeRate);
   const management = Math.round(annual * ASSUMPTIONS.shortTerm.managementRate);
-  assert.equal(str.lines.find((line) => line.label === "Platform fee")?.amount, platform);
   assert.equal(str.lines.find((line) => line.label === "Management")?.amount, management);
-  assert.ok((str.lines.find((line) => line.label === "Cleaning")?.amount ?? 0) > 0);
-  assert.ok(str.annualNet < str.annualGross - platform - management);
+  // Revenue is already net of the platform fee; cleaning, supplies, repairs and utilities aren't modeled.
+  assert.deepEqual(
+    str.lines.map((line) => line.label),
+    ["Management", "Added property tax"],
+  );
+  assert.equal(str.annualNet, str.annualGross - str.lines.reduce((sum, line) => sum + line.amount, 0));
   assert.equal(estimate.annualNet, str.annualNet);
   assert.equal(estimate.series[1]?.net, str.annualNet);
   assert.notEqual(estimate.scenarios.longTerm.annualNet, str.annualNet);
@@ -164,4 +158,26 @@ test("selecting the short-term scenario changes payback and the income approach"
   assert.notEqual(longTerm.breakEvenYears, shortTerm.breakEvenYears);
   assert.equal(longTerm.sqftUplift, shortTerm.sqftUplift);
   assert.notEqual(longTerm.blendedUplift, shortTerm.blendedUplift);
+});
+
+test("the long-term lease only deducts vacancy and added property tax", () => {
+  const lease = calculateEstimate(input({ monthlyRent: 3000 })).scenarios.longTerm;
+  assert.deepEqual(
+    lease.lines.map((line) => line.label),
+    ["Vacancy", "Added property tax"],
+  );
+});
+
+test("eco finish costs less than standard for every ADU type", () => {
+  for (const projectType of ["garage_conversion", "attached_adu", "detached_adu"] as const) {
+    const eco = calculateEstimate(input({ projectType, finish: "eco", sqft: 600 }));
+    const standard = calculateEstimate(input({ projectType, finish: "standard", sqft: 600 }));
+    assert.ok(eco.total < standard.total, projectType);
+  }
+});
+
+test("reports saved with the retired luxury finish open as premium", () => {
+  assert.equal(normalizeFinish("luxury"), "premium");
+  assert.equal(normalizeFinish("eco"), "eco");
+  assert.equal(normalizeFinish("gold"), null);
 });

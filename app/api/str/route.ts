@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { hasTeamAccess } from "@/lib/admin-auth";
 import { AIRROI_NOT_CONFIGURED_MESSAGE, buildAirRoiUrl, hasFreshAirRoiCache, lookupShortTerm } from "@/lib/airroi";
 import { guestsForBedrooms } from "@/lib/assumptions";
 import { enableSharedAirRoiCache } from "@/lib/airroi-cache";
@@ -12,7 +14,7 @@ export async function POST(request: Request): Promise<Response> {
   enableSharedAirRoiCache();
 
   const phone = verifiedPhoneFromRequest(request);
-  if (!phone) {
+  if (!phone && !hasTeamAccess(await cookies())) {
     return json(
       {
         ok: false,

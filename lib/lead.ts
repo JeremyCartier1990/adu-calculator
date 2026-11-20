@@ -1,4 +1,4 @@
-import type { FinishLevelId, ProjectTypeId } from "./assumptions";
+import { normalizeFinish, type FinishLevelId, type ProjectTypeId } from "./assumptions";
 import type { RentalUse } from "./calculate";
 import { normalizePhone } from "./phone";
 
@@ -32,7 +32,6 @@ export type LeadValidation =
   | { ok: false; errors: Record<string, string> };
 
 const PROJECT_TYPES = new Set<ProjectTypeId>(["garage_conversion", "attached_adu", "detached_adu"]);
-const FINISHES = new Set<FinishLevelId>(["standard", "premium", "luxury"]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -70,7 +69,7 @@ function parseSnapshot(value: unknown): EstimateSnapshot | null {
   const projectType = record.projectType;
   const finish = record.finish;
   if (typeof projectType !== "string" || !PROJECT_TYPES.has(projectType as ProjectTypeId)) return null;
-  if (typeof finish !== "string" || !FINISHES.has(finish as FinishLevelId)) return null;
+  if (!normalizeFinish(finish)) return null;
   const projectLabel = typeof record.projectLabel === "string" ? cleanText(record.projectLabel, 40) : "";
   const sqft = finiteNumber(record.sqft, 200, 2000);
   const bedrooms = finiteNumber(record.bedrooms, 0, 6);
@@ -102,7 +101,7 @@ function parseSnapshot(value: unknown): EstimateSnapshot | null {
     projectLabel,
     sqft,
     bedrooms,
-    finish: finish as FinishLevelId,
+    finish: normalizeFinish(finish)!,
     totalCost,
     monthlyRent,
     annualNet,
