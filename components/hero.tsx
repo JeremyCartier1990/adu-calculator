@@ -13,7 +13,7 @@ export function Hero({ children }: { children: React.ReactNode }) {
         />
         <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center px-5 pb-80 pt-12 text-center sm:pb-0 sm:pt-20">
           <Eyebrow>
-            <span className="hidden sm:inline">Los Angeles · </span>ADU investment analysis
+            <span className="hidden sm:inline">California · </span>ADU investment analysis
           </Eyebrow>
           <h1
             id="hero-heading"
