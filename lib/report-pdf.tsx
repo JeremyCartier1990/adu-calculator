@@ -1,6 +1,7 @@
 import "server-only";
 
-import { Document, Line, Page, Path, Rect, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
+import { Document, Line, Page, Path, Rect, renderToBuffer, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
+import { createElement } from "react";
 import { bedroomLabel } from "./assumptions";
 import { BRAND } from "./brand";
 import { calculateEstimate, type RentalScenario } from "./calculate";
@@ -95,6 +96,18 @@ function CashChart({ scenario }: { scenario: RentalScenario }) {
       </View>
     </View>
   );
+}
+
+/** "ADU-ROI-Report-2543-Walnut-Ave.pdf" */
+export function pdfFileName(report: ReportRecord): string {
+  const street = report.property.address.split(",")[0].replace(/[^\w]+/g, "-").replace(/^-|-$/g, "");
+  return `ADU-ROI-Report-${street || "property"}.pdf`;
+}
+
+/** The report PDF as bytes, for the download route and the email attachment. */
+export async function renderReportPdf(report: ReportRecord): Promise<Uint8Array<ArrayBuffer>> {
+  const pdf = await renderToBuffer(createElement(ReportPdf, { report }) as Parameters<typeof renderToBuffer>[0]);
+  return new Uint8Array(pdf);
 }
 
 export function ReportPdf({ report }: { report: ReportRecord }) {

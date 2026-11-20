@@ -178,7 +178,6 @@ export const ASSUMPTIONS = {
     largeGarageAboveSqft: 700,
   },
   cacheTtlMs: 24 * 60 * 60 * 1000,
-  cacheTtlSeconds: 24 * 60 * 60,
 } as const;
 
 /** Short-term guest count for the ADU itself: a studio sleeps 2, otherwise two guests per bedroom. */

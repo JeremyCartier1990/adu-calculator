@@ -1,24 +1,16 @@
 import "server-only";
 
-import { unstable_cache } from "next/cache";
-import { ASSUMPTIONS } from "./assumptions";
-import { requestRentCast, setRentCastPersistentLoader, type RentCastPayload } from "./rentcast";
+import { permanent } from "./partner-store";
+import { requestRentCast, setRentCastPersistentLoader } from "./rentcast";
 
 /**
- * Shared Next.js data cache. Entries last 24 hours and, via unstable_cache,
- * can survive a new deployment — important on a 50 lookup/month RentCast plan.
- * The in-memory layer in rentcast.ts sits in front of this.
+ * RentCast answers are stored forever (lib/partner-store.ts), so an address or
+ * rent query is bought once. The in-memory layer in rentcast.ts sits in front.
  */
-const loadCached = unstable_cache(
-  async (url: string): Promise<RentCastPayload> => requestRentCast(url),
-  ["rentcast-v1"],
-  { revalidate: ASSUMPTIONS.cacheTtlSeconds },
-);
-
 let enabled = false;
 
 export function enableSharedRentCastCache(): void {
   if (enabled) return;
   enabled = true;
-  setRentCastPersistentLoader((url) => loadCached(url));
+  setRentCastPersistentLoader((url) => permanent("rentcast", url, () => requestRentCast(url)));
 }

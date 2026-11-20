@@ -149,7 +149,7 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
   const shownMarket = status?.verified && latitude != null && longitude != null ? market : null;
 
   return (
-    <div className="mt-4 rounded-2xl border border-line bg-paper px-3 py-3">
+    <div className="mt-4 rounded-lg border border-line bg-paper px-3 py-3">
       <p className="text-sm font-medium">Nearby short-term data</p>
       {status == null ? (
         <p className="mt-1 text-sm text-ink-soft">Checking verification…</p>
@@ -171,7 +171,7 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
             autoComplete="tel"
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
-            className="min-h-12 w-full rounded-xl border border-line bg-white px-3 text-base outline-none focus:border-pine focus:ring-2 focus:ring-pine"
+            className="min-h-12 w-full rounded-lg border border-line bg-white px-3 text-base outline-none focus:border-pine focus:ring-2 focus:ring-pine"
           />
           {sent ? (
             <>
@@ -184,7 +184,7 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
                 autoComplete="one-time-code"
                 value={code}
                 onChange={(event) => setCode(event.target.value)}
-                className="min-h-12 w-full rounded-xl border border-line bg-white px-3 text-base outline-none focus:border-pine focus:ring-2 focus:ring-pine"
+                className="min-h-12 w-full rounded-lg border border-line bg-white px-3 text-base outline-none focus:border-pine focus:ring-2 focus:ring-pine"
               />
             </>
           ) : null}
@@ -193,7 +193,7 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
               type="button"
               disabled={pending}
               onClick={() => void sendCode()}
-              className="inline-flex min-h-11 items-center justify-center rounded-full bg-pine px-4 text-sm font-semibold text-white disabled:opacity-70"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pine px-4 text-sm font-semibold text-white disabled:opacity-70"
             >
               {sent ? "Send a new code" : "Text me a code"}
             </button>
@@ -202,7 +202,7 @@ export function StrPanel({ latitude, longitude, bedrooms, onMarketNumbers, onVer
                 type="button"
                 disabled={pending}
                 onClick={() => void checkCode()}
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-white px-4 text-sm font-semibold disabled:opacity-70"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-white px-4 text-sm font-semibold disabled:opacity-70"
               >
                 Verify code
               </button>

@@ -1,6 +1,7 @@
 import { ASSUMPTIONS, type FinishLevelId, type ProjectTypeId } from "./assumptions";
 import type { EstimateInput, RentSource, RentalUse } from "./calculate";
 import { cleanText } from "./lead";
+import type { PropertyFinancials } from "./propertyreach";
 
 /** Property facts the homeowner confirmed (or typed) before seeing the analysis. */
 export type ConfirmedProperty = {
@@ -27,11 +28,14 @@ export type ReportRecord = {
   createdAt: string;
   updatedAt: string;
   name: string;
-  email: string;
+  /** Only when the homeowner asked for the PDF by email. */
+  email: string | null;
   phone: string;
   phoneVerified: boolean;
   property: ConfirmedProperty;
   inputs: ReportInputs | null;
+  /** Mortgage and equity from PropertyReach, for the team only; filled in shortly after the report is created. */
+  financials: PropertyFinancials | null;
 };
 
 const PROJECTS = new Set<ProjectTypeId>(["garage_conversion", "attached_adu", "detached_adu"]);

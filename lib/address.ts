@@ -23,3 +23,13 @@ export function validateAddress(
   }
   return { ok: true, address };
 }
+
+/** Street and city only, lowercased and without punctuation, so "2543 Walnut Ave., Venice, CA 90291, USA" matches "2543 walnut ave, venice, ca". */
+export function addressIdentity(input: string): string {
+  return cleanAddress(input)
+    .toLowerCase()
+    .split(",")
+    .slice(0, 2)
+    .map((part) => part.replace(/[^a-z0-9]+/g, ""))
+    .join("|");
+}

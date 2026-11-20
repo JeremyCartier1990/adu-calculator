@@ -20,7 +20,8 @@ export type EstimateSnapshot = {
 export type SanitizedLead = {
   name: string;
   phone: string;
-  email: string;
+  /** Optional: asked later, only when the homeowner wants the PDF emailed. */
+  email: string | null;
   address: string;
   estimate: EstimateSnapshot | null;
 };
@@ -52,7 +53,7 @@ function cleanPhone(value: string): string | null {
   return normalizePhone(value);
 }
 
-function cleanEmail(value: string): string | null {
+export function cleanEmail(value: string): string | null {
   const email = cleanText(value, 120).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
   return email;
@@ -115,7 +116,7 @@ function parseSnapshot(value: unknown): EstimateSnapshot | null {
 export function validateLead(input: unknown): LeadValidation {
   const record = asRecord(input);
   if (!record) {
-    return { ok: false, errors: { form: "Send your name, phone, email, and address." } };
+    return { ok: false, errors: { form: "Send your name, phone, and address." } };
   }
 
   const honeypot = typeof record.companyWebsite === "string" ? record.companyWebsite.trim() : "";
@@ -124,17 +125,18 @@ export function validateLead(input: unknown): LeadValidation {
   const errors: Record<string, string> = {};
   const name = typeof record.name === "string" ? cleanText(record.name, 80) : "";
   const phone = typeof record.phone === "string" ? cleanPhone(record.phone) : null;
-  const email = typeof record.email === "string" ? cleanEmail(record.email) : null;
+  const emailInput = typeof record.email === "string" ? record.email.trim() : "";
+  const email = emailInput ? cleanEmail(emailInput) : null;
   const address = typeof record.address === "string" ? cleanText(record.address, 160) : "";
 
   if (name.length < 2 || !/\p{L}/u.test(name)) errors.name = "Enter your name.";
   if (!phone) errors.phone = "Enter a phone number with at least 10 digits.";
-  if (!email) errors.email = "Enter a valid email address.";
+  if (emailInput && !email) errors.email = "Enter a valid email address.";
   if (address.length < 8 || !/\p{L}/u.test(address) || !/\d/.test(address)) {
     errors.address = "Enter the property street, city, and state.";
   }
 
-  if (Object.keys(errors).length > 0 || !phone || !email) {
+  if (Object.keys(errors).length > 0 || !phone) {
     return { ok: false, errors };
   }
 

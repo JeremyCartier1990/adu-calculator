@@ -1,5 +1,7 @@
+import { addressIdentity } from "@/lib/address";
 import { normalizePhone } from "@/lib/phone";
 import { clientIp, RATE_LIMITS, takeToken } from "@/lib/rate-limit";
+import { findReportByPhone } from "@/lib/report-store";
 import { sendSmsCode } from "@/lib/twilio-verify";
 import { verificationConfigured } from "@/lib/verify-cookie";
 
@@ -25,6 +27,22 @@ export async function POST(request: Request): Promise<Response> {
   const phone = normalizePhone(typeof (body as { phone?: unknown }).phone === "string" ? (body as { phone: string }).phone : "");
   if (!phone) {
     return json({ ok: false, code: "invalid", message: "Enter a phone number with at least 10 digits." }, 400);
+  }
+
+  // Each phone gets one address; refuse before paying for a text that can't open a new report.
+  const address = (body as { address?: unknown }).address;
+  if (typeof address === "string" && address.trim()) {
+    const existing = await findReportByPhone(phone).catch(() => null);
+    if (existing && addressIdentity(existing.property.address) !== addressIdentity(address)) {
+      return json(
+        {
+          ok: false,
+          code: "phone_used",
+          message: "This phone number already has a report for another address. Each number can run one address.",
+        },
+        409,
+      );
+    }
   }
 
   const ip = clientIp(request);

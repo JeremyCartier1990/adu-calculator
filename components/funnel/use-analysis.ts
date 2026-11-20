@@ -15,19 +15,26 @@ type MarketNumbers = { adr: number; occupancy: number };
  * rent for the chosen size (fetched once per 50 sqft step, debounced), the
  * short-term market numbers once the phone is verified, and the estimate.
  */
-export function useAnalysis(property: ConfirmedProperty) {
-  const [projectType, setProjectTypeState] = useState<ProjectTypeId>("detached_adu");
-  const [finish, setFinish] = useState<FinishLevelId>("premium");
-  const [sqft, setSqft] = useState(ASSUMPTIONS.size.defaults.detached_adu);
-  const [rentOverride, setRentOverride] = useState<string | null>(null);
+export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | null = null) {
+  const [projectType, setProjectTypeState] = useState<ProjectTypeId>(saved?.projectType ?? "detached_adu");
+  const [finish, setFinish] = useState<FinishLevelId>(saved?.finish ?? "premium");
+  const [sqft, setSqft] = useState(saved?.sqft ?? ASSUMPTIONS.size.defaults.detached_adu);
+  // Saved choices reopen as they were; a rent the homeowner typed stays typed.
+  const [rentOverride, setRentOverride] = useState<string | null>(
+    saved?.rentSource === "manual" ? String(saved.monthlyRent) : null,
+  );
   const [rentByKey, setRentByKey] = useState<Record<string, RentHit>>({});
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [rentNote, setRentNote] = useState<string | null>(null);
-  const [rentalUse, setRentalUse] = useState<RentalUse>("long_term");
-  const [occupancyPercent, setOccupancyPercentState] = useState(Math.round(ASSUMPTIONS.shortTerm.defaultOccupancy * 100));
-  const [nightlyOverride, setNightlyOverride] = useState<string | null>(null);
+  const [rentalUse, setRentalUse] = useState<RentalUse>(saved?.rentalUse ?? "long_term");
+  const [occupancyPercent, setOccupancyPercentState] = useState(
+    Math.round((saved?.strOccupancy ?? ASSUMPTIONS.shortTerm.defaultOccupancy) * 100),
+  );
+  const [nightlyOverride, setNightlyOverride] = useState<string | null>(
+    saved?.strNightlyRate != null ? String(saved.strNightlyRate) : null,
+  );
   const [market, setMarket] = useState<MarketNumbers | null>(null);
-  const occupancyTouched = useRef(false);
+  const occupancyTouched = useRef(saved?.strOccupancy != null);
   const inflight = useRef(new Set<string>());
 
   const live = property.source === "rentcast";

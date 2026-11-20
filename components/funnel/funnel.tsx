@@ -6,6 +6,7 @@ import { AddressInput } from "@/components/funnel/address-input";
 import { ArrowBox } from "@/components/eyebrow";
 import { Hero } from "@/components/hero";
 import { trackLeadConversion } from "@/lib/redtrack";
+import { rememberEditKey } from "@/lib/report-keys";
 import { validateAddress } from "@/lib/address";
 import type { PropertyLookup } from "@/lib/api-types";
 import { BRAND } from "@/lib/brand";
@@ -116,7 +117,10 @@ export function Funnel() {
   }
 
   function openAnalysis(saved: SavedReport | null, note: string | null) {
-    if (saved) trackLeadConversion(saved.id);
+    if (saved) {
+      trackLeadConversion(saved.id);
+      rememberEditKey(saved.id, saved.editKey);
+    }
     setReport(saved);
     setSaveNote(note);
     setStep("analysis");
@@ -284,6 +288,40 @@ function ConfirmStep({
   );
 }
 
+/** Format US digits as (310) 555-0123 while typing; a pasted or autofilled +1 is dropped. */
+function formatUsPhone(value: string): string {
+  let digits = value.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+  digits = digits.slice(0, 10);
+  if (digits.length <= 3) return digits.length === 3 ? `(${digits})` : digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+/** US flag as SVG, since flag emoji don't render on Windows. */
+function UsFlag() {
+  return (
+    <svg viewBox="0 0 19 10" className="h-3.5 w-[26px] shrink-0 overflow-hidden rounded-[2px] shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" aria-hidden="true">
+      <rect width="19" height="10" fill="#fff" />
+      {[0, 2, 4, 6, 8, 10, 12].map((row) => (
+        <rect key={row} y={(row * 10) / 13} width="19" height={10 / 13} fill="#b22234" />
+      ))}
+      <rect width="7.6" height={(7 * 10) / 13} fill="#3c3b6e" />
+    </svg>
+  );
+}
+
+function RequiredLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-sm font-medium">
+      {children}
+      <span className="ml-0.5 text-clay" aria-hidden="true">
+        *
+      </span>
+    </span>
+  );
+}
+
 type VerifyStatus = { twilio: boolean; verified: boolean; phone: string | null };
 
 function ContactStep({
@@ -296,7 +334,6 @@ function ContactStep({
   onDone: (report: SavedReport | null, note: string | null) => void;
 }) {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
   const [code, setCode] = useState("");
@@ -321,7 +358,6 @@ function ContactStep({
   function check(): boolean {
     const next: Record<string, string> = {};
     if (name.trim().length < 2) next.name = "Enter your name.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = "Enter a valid email address.";
     if (!normalized) next.phone = "Enter a 10-digit US phone number.";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -332,8 +368,12 @@ function ContactStep({
     setPending(true);
     setMessage(null);
     try {
-      const data = await postJson<{ ok: boolean; message?: string }>("/api/verify/start", { phone });
-      if (!data.ok) setMessage(data.message ?? "We couldn't send a text to that number.");
+      const data = await postJson<{ ok: boolean; code?: string; message?: string }>("/api/verify/start", {
+        phone,
+        address: property.address,
+      });
+      if (data.code === "phone_used") setErrors({ phone: data.message ?? "This phone number already has a report." });
+      else if (!data.ok) setMessage(data.message ?? "We couldn't send a text to that number.");
       else setCodeSent(true);
     } catch {
       setMessage("We couldn't send a text to that number.");
@@ -361,7 +401,7 @@ function ContactStep({
         code?: string;
         message?: string;
         errors?: Record<string, string>;
-      }>("/api/reports", { name, email, phone, property, companyWebsite: website });
+      }>("/api/reports", { name, phone, property, companyWebsite: website });
       if (data.ok && data.id && data.editKey) {
         onDone({ id: data.id, editKey: data.editKey }, null);
         return;
@@ -370,8 +410,10 @@ function ContactStep({
         onDone(null, data.message ?? null);
         return;
       }
-      setErrors(data.errors ?? {});
-      setMessage(data.message ?? "Something went wrong. Try again.");
+      const fieldErrors = data.errors ?? {};
+      setErrors(fieldErrors);
+      // A problem shown under a field isn't repeated below the form.
+      setMessage(Object.keys(fieldErrors).length > 0 ? null : (data.message ?? "Something went wrong. Try again."));
     } catch {
       setMessage("Something went wrong. Try again.");
     } finally {
@@ -392,16 +434,18 @@ function ContactStep({
       }}
     >
       <Progress at={2} />
-      <h2 className="mt-6 font-display text-4xl leading-tight">Where should we send your report?</h2>
+      <h2 className="mt-6 font-display text-4xl leading-tight">Who is this report for?</h2>
       <p className="mt-2 text-sm leading-6 text-ink-soft">
-        Your report gets a private link and a PDF. {needsCode ? "We text a code to confirm your number." : ""}
+        Your report gets a private link and a PDF you can download or email yourself.{" "}
+        {needsCode ? "We text a code to confirm your number." : ""}
       </p>
 
       <div className="mt-6 space-y-3">
         <label className="block">
-          <span className="text-sm font-medium">Full name</span>
+          <RequiredLabel>Full name</RequiredLabel>
           <input
             autoComplete="name"
+            aria-required="true"
             value={name}
             onChange={(event) => setName(event.target.value)}
             aria-invalid={Boolean(errors.name) || undefined}
@@ -410,29 +454,29 @@ function ContactStep({
           {errors.name ? <span className="mt-1 block text-sm text-clay">{errors.name}</span> : null}
         </label>
         <label className="block">
-          <span className="text-sm font-medium">Email</span>
-          <input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            aria-invalid={Boolean(errors.email) || undefined}
-            className={`${field} ${errors.email ? "border-clay" : "border-line"}`}
-          />
-          {errors.email ? <span className="mt-1 block text-sm text-clay">{errors.email}</span> : null}
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium">Mobile phone</span>
-          <input
-            type="tel"
-            autoComplete="tel"
-            inputMode="tel"
-            value={phone}
-            disabled={codeSent}
-            onChange={(event) => setPhone(event.target.value)}
-            aria-invalid={Boolean(errors.phone) || undefined}
-            className={`${field} ${errors.phone ? "border-clay" : "border-line"} disabled:bg-paper`}
-          />
+          <RequiredLabel>Mobile phone</RequiredLabel>
+          <span
+            className={`mt-1 flex min-h-12 items-center rounded-xl border bg-white focus-within:border-ink focus-within:ring-4 focus-within:ring-ink/10 ${
+              errors.phone ? "border-clay" : "border-line"
+            } ${codeSent ? "bg-paper" : ""}`}
+          >
+            <span className="flex shrink-0 items-center gap-2 self-stretch border-r border-line pl-3 pr-3 text-base text-ink-soft" aria-label="United States, +1">
+              <UsFlag />
+              <span aria-hidden="true">+1</span>
+            </span>
+            <input
+              type="tel"
+              autoComplete="tel"
+              inputMode="tel"
+              aria-required="true"
+              placeholder="(310) 555-0123"
+              value={phone}
+              disabled={codeSent}
+              onChange={(event) => setPhone(formatUsPhone(event.target.value))}
+              aria-invalid={Boolean(errors.phone) || undefined}
+              className="min-h-12 w-full rounded-r-xl bg-transparent px-3 text-base tabular-nums outline-none placeholder:text-ink-soft/60"
+            />
+          </span>
           {errors.phone ? <span className="mt-1 block text-sm text-clay">{errors.phone}</span> : null}
         </label>
         {codeSent ? (
@@ -478,8 +522,8 @@ function ContactStep({
         Back
       </button>
       <p className="mt-5 text-xs leading-5 text-ink-soft">
-        By continuing, you agree that {BRAND.builder}, the builder behind {BRAND.name}, may contact you by phone, text, and email
-        about your ADU project, including with automated technology. Consent isn&apos;t a condition of purchase. Message and data
+        By continuing, you agree that {BRAND.builder}, the builder behind {BRAND.name}, may contact you by phone and text, and by email
+        if you share one, about your ADU project, including with automated technology. Consent isn&apos;t a condition of purchase. Message and data
         rates may apply.
       </p>
     </form>

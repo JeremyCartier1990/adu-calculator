@@ -73,3 +73,10 @@ test("a broken estimate snapshot does not reject a valid lead", () => {
   if (!result.ok || result.dropped) return;
   assert.equal(result.lead.estimate, null);
 });
+
+test("email is optional; the homeowner can add one later for the PDF", () => {
+  const result = validateLead({ name: "Ada Lovelace", phone: "(310) 555-0123", address: "12 Main St, Los Angeles, CA" });
+  assert.equal(result.ok, true);
+  if (!result.ok || result.dropped) return;
+  assert.equal(result.lead.email, null);
+});

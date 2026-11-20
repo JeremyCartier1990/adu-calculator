@@ -38,10 +38,10 @@ async function Leads() {
         <SignOut />
       </div>
       <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
-        <table className="w-full min-w-[960px] text-sm">
+        <table className="w-full min-w-[1080px] text-sm">
           <thead className="bg-paper text-left text-xs uppercase tracking-wide text-ink-soft">
             <tr>
-              {["Created", "Homeowner", "Property", "ADU", "Cost", "Net / mo", "Cash-on-cash", ""].map((label) => (
+              {["Created", "Homeowner", "Property", "Equity", "ADU", "Cost", "Net / mo", "Cash-on-cash", ""].map((label) => (
                 <th key={label} className="px-4 py-3 font-medium">
                   {label}
                 </th>
@@ -57,11 +57,13 @@ async function Leads() {
                   <td className="whitespace-nowrap px-4 py-3 text-ink-soft">{formatDate(report.createdAt)}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium">{report.name}</p>
-                    <p className="text-ink-soft">
-                      <a href={`mailto:${report.email}`} className="hover:underline">
-                        {report.email}
-                      </a>
-                    </p>
+                    {report.email ? (
+                      <p className="text-ink-soft">
+                        <a href={`mailto:${report.email}`} className="hover:underline">
+                          {report.email}
+                        </a>
+                      </p>
+                    ) : null}
                     <p className="text-ink-soft">
                       <a href={`tel:${report.phone}`} className="hover:underline">
                         {report.phone}
@@ -70,6 +72,19 @@ async function Leads() {
                     </p>
                   </td>
                   <td className="max-w-[260px] px-4 py-3">{report.property.address}</td>
+                  <td className="whitespace-nowrap px-4 py-3 tabular-nums">
+                    {report.financials?.estimatedEquity != null ? (
+                      <>
+                        {formatMoney(report.financials.estimatedEquity)}
+                        <span className="block text-xs text-ink-soft">
+                          {report.financials.loanToValue != null ? `${Math.round(report.financials.loanToValue * 100)}% LTV` : "No loan data"}
+                          {report.financials.helocCapacity != null ? ` · ${formatMoney(report.financials.helocCapacity)} line room` : ""}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-ink-soft">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {estimate ? `${projectTitle(estimate.projectType)} · ${estimate.sqft} sqft` : <span className="text-ink-soft">Not chosen yet</span>}
                   </td>
@@ -89,7 +104,7 @@ async function Leads() {
             })}
             {reports.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-ink-soft">
+                <td colSpan={9} className="px-4 py-10 text-center text-ink-soft">
                   No reports yet.
                 </td>
               </tr>

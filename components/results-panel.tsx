@@ -83,8 +83,8 @@ export function ResultsPanel({
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl border border-line bg-surface p-5 shadow-[0_18px_50px_rgba(28,25,21,0.06)] sm:p-6" aria-labelledby="estimate-heading">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-clay">Estimate</p>
+      <section className="rounded-xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="estimate-heading">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-soft">Your estimate</p>
         <h3 id="estimate-heading" className="mt-2 font-display text-3xl text-ink">
           {estimate.projectLabel}
         </h3>
@@ -95,27 +95,11 @@ export function ResultsPanel({
           These figures are estimates, not a quote. Costs, rent, taxes, and resale value will vary.
         </p>
 
-        <dl className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl bg-paper px-3 py-3">
-            <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Project cost</dt>
-            <dd className="mt-1 text-xl font-semibold tabular-nums">{formatMoney(estimate.total)}</dd>
-          </div>
-          <div className="rounded-2xl bg-paper px-3 py-3">
-            <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Net / month</dt>
-            <dd className="mt-1 text-xl font-semibold tabular-nums">{formatMoney(estimate.monthlyNet)}</dd>
-            <p className="mt-1 text-xs text-ink-soft">{scenarioName}</p>
-          </div>
-          <div className="rounded-2xl bg-paper px-3 py-3">
-            <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Payback</dt>
-            <dd className="mt-1 text-xl font-semibold tabular-nums">{formatYears(estimate.breakEvenYears)}</dd>
-            <p className="mt-1 text-xs text-ink-soft">{scenarioName}</p>
-          </div>
-        </dl>
 
         {estimate.warnings.length > 0 ? (
           <ul className="mt-4 space-y-2">
             {estimate.warnings.map((warning) => (
-              <li key={warning} className="rounded-2xl bg-pine-soft px-3 py-2 text-sm leading-6 text-pine">
+              <li key={warning} className="rounded-lg bg-pine-soft px-3 py-2 text-sm leading-6 text-pine">
                 {warning}
               </li>
             ))}
@@ -123,7 +107,7 @@ export function ResultsPanel({
         ) : null}
       </section>
 
-      <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="cost-heading">
+      <section className="rounded-xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="cost-heading">
         <h3 id="cost-heading" className="font-display text-2xl">Project cost</h3>
         <dl className="mt-2">
           <Row label="Construction" value={formatMoney(estimate.construction)} hint="Size × cost per square foot" />
@@ -144,7 +128,7 @@ export function ResultsPanel({
         </dl>
       </section>
 
-      <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="income-heading">
+      <section className="rounded-xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="income-heading">
         <h3 id="income-heading" className="font-display text-2xl">Rent & payback</h3>
         <p className="mt-1 text-sm leading-6 text-ink-soft">
           Both figures stay on screen. Payback, the chart, and the income approach follow the one you select.
@@ -180,7 +164,7 @@ export function ResultsPanel({
             <label htmlFor="nightly-rate" className="text-sm font-medium">
               Nightly rate
             </label>
-            <div className="mt-1 flex min-h-12 items-center rounded-xl border border-line bg-white focus-within:border-pine focus-within:ring-2 focus-within:ring-pine">
+            <div className="mt-1 flex min-h-12 items-center rounded-lg border border-line bg-white focus-within:border-pine focus-within:ring-2 focus-within:ring-pine">
               <span className="pl-3 text-ink-soft">$</span>
               <input
                 id="nightly-rate"
@@ -250,7 +234,7 @@ export function ResultsPanel({
         </div>
       </section>
 
-      <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="value-heading">
+      <section className="rounded-xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="value-heading">
         <h3 id="value-heading" className="font-display text-2xl">Value & equity</h3>
         <p className="mt-1 text-sm leading-6 text-ink-soft">
           {estimate.usedFallbackValuePerSqft
@@ -292,7 +276,7 @@ export function ResultsPanel({
         </p>
       </section>
 
-      <details className="rounded-3xl border border-line bg-surface p-5 sm:p-6">
+      <details className="rounded-xl border border-line bg-surface p-5 sm:p-6">
         <summary className="cursor-pointer font-medium text-pine">How these numbers are calculated</summary>
         <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-ink-soft">
           {estimate.notes.map((note) => (
@@ -317,7 +301,7 @@ function ScenarioCard({
 }) {
   return (
     <label
-      className={`block cursor-pointer rounded-2xl border p-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-pine ${selected ? "border-pine bg-pine-soft" : "border-line bg-white"}`}
+      className={`block cursor-pointer rounded-lg border p-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-pine ${selected ? "border-pine bg-pine-soft" : "border-line bg-white"}`}
     >
       <input
         type="radio"
