@@ -1,3 +1,5 @@
+import { splitAddress } from "./address";
+import { dayLabel, TIME_ZONE, windowFor, type Appointment } from "./appointment";
 import { ATTRIBUTION_KEYS, type Attribution } from "./attribution";
 import { bedroomsForSqft, projectTitle } from "./assumptions";
 import { BRAND } from "./brand";
@@ -53,6 +55,7 @@ export function leadPayload(report: ReportRecord, attribution: Attribution | nul
     },
     property: {
       address: property.address,
+      ...splitAddress(property.address),
       home_sqft: property.squareFootage,
       lot_sqft: property.lotSize,
       bedrooms: property.bedrooms,
@@ -75,9 +78,37 @@ export function leadPayload(report: ReportRecord, attribution: Attribution | nul
 
 /** POST a new lead to LEAD_WEBHOOK_URL. Runs after the response; one retry, never throws. */
 export async function sendLeadWebhook(report: ReportRecord, attribution: Attribution | null): Promise<void> {
+  await postWebhook(report.id, leadPayload(report, attribution));
+}
+
+export function appointmentPayload(report: ReportRecord, appointment: Appointment, attribution: Attribution | null) {
+  const window = windowFor(appointment.window);
+  return {
+    ...leadPayload(report, attribution),
+    event: "appointment.requested",
+    appointment: {
+      date: appointment.date,
+      day: dayLabel(appointment.date, "long"),
+      window: window.id,
+      window_label: `${window.label}, ${window.hours}`,
+      start_time: window.start,
+      end_time: window.end,
+      time_zone: TIME_ZONE,
+      note: appointment.note,
+      requested_at: new Date().toISOString(),
+    },
+  };
+}
+
+/** POST a call request to LEAD_WEBHOOK_URL, with the same lead fields as the new-lead event. */
+export async function sendAppointmentWebhook(report: ReportRecord, appointment: Appointment, attribution: Attribution | null): Promise<void> {
+  await postWebhook(report.id, appointmentPayload(report, appointment, attribution));
+}
+
+async function postWebhook(id: string, payload: { event: string }): Promise<void> {
   const url = process.env.LEAD_WEBHOOK_URL;
   if (!url) return;
-  const body = JSON.stringify(leadPayload(report, attribution));
+  const body = JSON.stringify(payload);
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await fetch(url, {
@@ -87,12 +118,12 @@ export async function sendLeadWebhook(report: ReportRecord, attribution: Attribu
         signal: AbortSignal.timeout(8000),
       });
       if (response.ok) {
-        console.info(JSON.stringify({ event: "lead_webhook_sent", id: report.id, status: response.status }));
+        console.info(JSON.stringify({ event: "webhook_sent", type: payload.event, id, status: response.status }));
         return;
       }
-      console.error(JSON.stringify({ event: "lead_webhook_failed", id: report.id, status: response.status, attempt }));
+      console.error(JSON.stringify({ event: "webhook_failed", type: payload.event, id, status: response.status, attempt }));
     } catch (error) {
-      console.error(JSON.stringify({ event: "lead_webhook_failed", id: report.id, error: String(error), attempt }));
+      console.error(JSON.stringify({ event: "webhook_failed", type: payload.event, id, error: String(error), attempt }));
     }
   }
 }

@@ -47,6 +47,10 @@ test("the lead payload carries the lead, property, UTMs, and report link", () =>
   assert.equal(payload.lead.first_name, "Maria");
   assert.equal(payload.lead.last_name, "de la Cruz");
   assert.equal(payload.property.data_source, "public_records");
+  assert.equal(payload.property.street, "123 Main St");
+  assert.equal(payload.property.city, "Los Angeles");
+  assert.equal(payload.property.state, "CA");
+  assert.equal(payload.property.zipcode, "90001");
   assert.equal(payload.utm.utm_source, "facebook");
   assert.equal(payload.utm.utm_medium, null);
   assert.equal(payload.utm.fbclid, "fb.1");

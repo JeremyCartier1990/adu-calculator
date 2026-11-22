@@ -3,17 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowBox, Eyebrow } from "@/components/eyebrow";
 import { FinancingSection } from "@/components/funnel/financing-section";
+import { ScheduleCall } from "@/components/funnel/schedule-call";
 import { FACT_FIELDS } from "@/components/funnel/shared";
 import { useAnalysis } from "@/components/funnel/use-analysis";
 import { CalculationBreakdown } from "@/components/report/calculation-breakdown";
 import { InvestmentSummary, projectPhrase } from "@/components/report/investment-summary";
-import { LotMap, requestLotDrawing } from "@/components/report/lot-map";
+import { LotMapDialog } from "@/components/report/lot-map-dialog";
 import { ResultsPanel } from "@/components/results-panel";
 import { ASSUMPTIONS, bedroomLabel, FINISH_LEVELS, PROJECT_TYPES, projectTitle } from "@/lib/assumptions";
 import { BRAND } from "@/lib/brand";
 import { BEST_SETUP_YEARS } from "@/lib/optimize";
-import { breakdownSteps, financingFor, headline, settingsUsed } from "@/lib/breakdown";
-import { formatMoney } from "@/lib/money";
+import { breakdownSteps, financingFor, headline, settingsUsed, type Headline } from "@/lib/breakdown";
+import { areaSqft } from "@/lib/footprint";
+import { formatMoney, formatNumber } from "@/lib/money";
 import type { ConfirmedProperty, ReportInputs } from "@/lib/report";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -46,6 +48,20 @@ export function AnalysisSection({
   const reportOnly = editing ? "max-lg:hidden" : "";
   const settingsOnly = editing ? "" : "max-lg:hidden";
   const summary = headline(estimate, financing);
+
+  // The three headline numbers follow the page once the summary scrolls away, so every change shows.
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const [summaryGone, setSummaryGone] = useState(false);
+  useEffect(() => {
+    const band = summaryRef.current;
+    if (!band) return;
+    const observer = new IntersectionObserver(([entry]) => setSummaryGone(!entry.isIntersecting && entry.boundingClientRect.top < 0));
+    observer.observe(band);
+    return () => observer.disconnect();
+  }, []);
+
+  // The lot map opens full screen: "open" to look and place, "draw" to start tapping corners.
+  const [map, setMap] = useState<"open" | "draw" | null>(null);
 
   function toggleEditing(next: boolean) {
     setEditing(next);
@@ -94,28 +110,13 @@ export function AnalysisSection({
     : (saveNote ?? "This analysis isn't saved.");
 
   return (
-    <section id="analysis" className={`mx-auto max-w-[1400px] scroll-mt-4 px-3 py-10 sm:px-4 md:py-14 ${editing ? "" : "max-lg:pb-28"}`} aria-labelledby="analysis-heading">
-      {editing ? (
-        <div className="sticky top-0 z-30 -mx-3 mb-3 border-b border-white/10 bg-ink px-4 py-3 text-white shadow-lg sm:-mx-4 lg:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">Editing · updates live</p>
-              <p className="mt-0.5 truncate text-sm tabular-nums">
-                {formatMoney(summary.invest)} → <span className="text-[#7fd6a8]">+{formatMoney(summary.valueAdded)}</span>
-              </p>
-              <p className="text-xs tabular-nums text-white/70">
-                You keep {formatMoney(summary.longTerm)} lease · {formatMoney(summary.shortTerm)} short-term
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => toggleEditing(false)}
-              className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-white px-4 text-sm font-semibold text-ink"
-            >
-              See report
-            </button>
-          </div>
-        </div>
+    <section id="analysis" className={`mx-auto max-w-[1400px] scroll-mt-4 px-3 py-10 sm:px-4 md:py-14 ${editing ? "max-lg:pt-28" : "max-lg:pb-28"}`} aria-labelledby="analysis-heading">
+      {editing || summaryGone ? (
+        <LiveNumbers
+          summary={summary}
+          className={`${editing ? "" : "max-lg:hidden"} ${summaryGone ? "" : "lg:hidden"}`}
+          onDone={editing ? () => toggleEditing(false) : null}
+        />
       ) : null}
       <div className="overflow-hidden rounded-2xl border border-line bg-surface">
         <div className={`flex flex-col lg:flex-row ${reportOnly}`}>
@@ -135,6 +136,14 @@ export function AnalysisSection({
             </div>
             {report && reportUrl ? (
               <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                {team ? null : (
+                  <a
+                    href="#book-call"
+                    className="col-span-2 inline-flex min-h-12 items-center justify-center rounded-lg border border-pine bg-pine/10 px-5 text-sm font-semibold text-ink hover:bg-pine/15"
+                  >
+                    Book a call about this report
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() => toggleEditing(true)}
@@ -185,7 +194,7 @@ export function AnalysisSection({
           </div>
         </div>
 
-        <div className={`bg-ink p-5 sm:p-8 lg:p-10 ${reportOnly}`}>
+        <div ref={summaryRef} className={`bg-ink p-5 sm:p-8 lg:p-10 ${reportOnly}`}>
           <InvestmentSummary estimate={estimate} summary={summary} />
           <div className="mt-5 flex flex-col gap-3 rounded-xl border border-white/15 px-4 py-3 text-sm text-white/80 sm:flex-row sm:items-center sm:justify-between">
             <p className="leading-6">
@@ -204,6 +213,12 @@ export function AnalysisSection({
             )}
           </div>
         </div>
+
+        {report && !team ? (
+          <div className={reportOnly}>
+            <ScheduleCall report={report} />
+          </div>
+        ) : null}
 
         <div className="grid items-start gap-8 p-4 sm:p-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-10 lg:p-10">
           <div className={`min-w-0 space-y-8 ${reportOnly}`}>
@@ -295,9 +310,7 @@ export function AnalysisSection({
                 <button
                   type="button"
                   onClick={() => {
-                    // The map belongs to the report view on phones, so leave edit mode first.
-                    setEditing(false);
-                    requestAnimationFrame(requestLotDrawing);
+                    setMap("draw");
                   }}
                   className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-semibold text-ink transition hover:border-ink"
                 >
@@ -473,24 +486,41 @@ export function AnalysisSection({
           </div>
         ) : null}
 
-        <div className={`border-t border-line p-4 sm:p-8 lg:px-10 ${reportOnly}`}>
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className={`flex flex-col gap-4 border-t border-line p-5 sm:flex-row sm:items-center sm:justify-between sm:p-8 lg:px-10 ${reportOnly}`}>
+          <div>
             <h3 className="font-display text-2xl text-ink">Place the ADU on your lot</h3>
-            <p className="text-sm text-ink-soft">Satellite view · drawn sizes are approximate</p>
+            <p className="mt-1 text-sm leading-6 text-ink-soft">
+              {analysis.footprint
+                ? `Placed on the satellite view: ${formatNumber(Math.round(areaSqft(analysis.footprint)))} sqft.`
+                : "See your lot from above and draw the ADU where it would go."}
+            </p>
           </div>
-          <LotMap
-            address={property.address}
-            latitude={property.latitude}
-            longitude={property.longitude}
-            footprint={analysis.footprint}
-            onFootprint={analysis.setFootprint}
-            targetSqft={analysis.sqft}
-            onUseSqft={analysis.setSqft}
-            canPlace={analysis.projectType !== "garage_conversion"}
-          />
+          <button
+            type="button"
+            onClick={() => setMap("open")}
+            className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-ink px-5 text-sm font-semibold text-white hover:bg-ink/85"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M2 4l4-2 4 2 4-2v10l-4 2-4-2-4 2z M6 2v10 M10 4v10" />
+            </svg>
+            {analysis.footprint ? "Open the lot map" : "Open the satellite map"}
+          </button>
         </div>
 
       </div>
+
+      <LotMapDialog
+        mode={map}
+        onClose={() => setMap(null)}
+        address={property.address}
+        latitude={property.latitude}
+        longitude={property.longitude}
+        footprint={analysis.footprint}
+        onFootprint={analysis.setFootprint}
+        targetSqft={analysis.sqft}
+        onUseSqft={analysis.setSqft}
+        canPlace={analysis.projectType !== "garage_conversion"}
+      />
 
       {editing ? null : (
         <button
@@ -503,6 +533,46 @@ export function AnalysisSection({
         </button>
       )}
     </section>
+  );
+}
+
+/** Pinned to the top: what you invest, what the home gains, and what you keep, live as settings change. */
+function LiveNumbers({ summary, className, onDone }: { summary: Headline; className: string; onDone: (() => void) | null }) {
+  const tone = (value: number) => (value >= 0 ? "text-[#7fd6a8]" : "text-[#f0a37f]");
+  return (
+    <div className={`fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-ink text-white shadow-lg ${className}`} aria-live="polite">
+      <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2.5 sm:px-6 lg:gap-6 lg:py-3">
+        <p className="hidden w-28 shrink-0 text-[11px] font-semibold uppercase leading-4 tracking-[0.12em] text-white/55 xl:block">Live numbers</p>
+        <dl className="grid min-w-0 flex-1 grid-cols-[auto_auto] gap-x-4 gap-y-0.5 lg:grid-cols-[1fr_1fr_1.4fr] lg:gap-6">
+          <div className="min-w-0">
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">You invest</dt>
+            <dd className="font-display text-base tabular-nums lg:text-2xl">{formatMoney(summary.invest)}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">Home gains</dt>
+            <dd className="font-display text-base tabular-nums text-[#7fd6a8] lg:text-2xl">
+              +{formatMoney(summary.valueAdded)}
+              <span className="ml-2 hidden font-sans text-xs text-white/60 lg:inline">
+                {summary.equity >= 0 ? `${formatMoney(summary.equity)} more than it costs` : `${formatMoney(-summary.equity)} less than it costs`}
+              </span>
+            </dd>
+          </div>
+          <div className="col-span-2 min-w-0 lg:col-span-1">
+            <dt className="hidden text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55 lg:block">You keep every month</dt>
+            <dd className="text-xs tabular-nums text-white/75 lg:text-sm">
+              <span className={`font-display text-sm lg:text-2xl ${tone(summary.longTerm)}`}>{formatMoney(summary.longTerm)}</span> lease ·{" "}
+              <span className={`font-display text-sm lg:text-2xl ${tone(summary.shortTerm)}`}>{formatMoney(summary.shortTerm)}</span> short-term
+              {summary.financed ? <span className="hidden text-white/55 xl:inline"> · after {formatMoney(summary.monthlyDebt)} loans</span> : null}
+            </dd>
+          </div>
+        </dl>
+        {onDone ? (
+          <button type="button" onClick={onDone} className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-white px-4 text-sm font-semibold text-ink lg:hidden">
+            See report
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

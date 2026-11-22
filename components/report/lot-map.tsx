@@ -15,14 +15,6 @@ type Status = "loading" | "ready" | "unavailable";
  * ADU on it (tap the corners, drag them, turn the shape) and sees its square footage.
  * Touch-first: big buttons under the map, one-finger dragging while a shape is on it.
  */
-const DRAW_EVENT = "adu-lot-map:draw";
-
-/** Scrolls to the lot map and starts drawing corners, when the map is up. */
-export function requestLotDrawing() {
-  document.getElementById("lot-map")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  window.dispatchEvent(new Event(DRAW_EVENT));
-}
-
 export function LotMap({
   address,
   latitude,
@@ -32,6 +24,8 @@ export function LotMap({
   targetSqft,
   onUseSqft,
   canPlace = true,
+  fill = false,
+  drawOnReady = false,
 }: {
   address: string;
   latitude: number | null;
@@ -43,6 +37,10 @@ export function LotMap({
   onUseSqft?: (sqft: number) => void;
   /** False for garage conversions, which reuse the existing garage. */
   canPlace?: boolean;
+  /** Fill the parent's height, as in the full-screen map. */
+  fill?: boolean;
+  /** Start drawing corners as soon as the map is up. */
+  drawOnReady?: boolean;
 }) {
   const editable = Boolean(onFootprint) && canPlace;
   const element = useRef<HTMLDivElement>(null);
@@ -79,7 +77,7 @@ export function LotMap({
           heading: 0,
           disableDefaultUI: true,
           zoomControl: true,
-          fullscreenControl: true,
+          fullscreenControl: !fill,
           clickableIcons: false,
           keyboardShortcuts: false,
           gestureHandling: "cooperative",
@@ -152,13 +150,13 @@ export function LotMap({
     }
   }, [drawing]);
 
-  // "Draw it on the map" elsewhere on the page (see requestLotDrawing) starts drawing mode here.
+  const drewOnReady = useRef(false);
   useEffect(() => {
-    if (!editable || status !== "ready") return;
-    const start = () => setDrawing([]);
-    window.addEventListener(DRAW_EVENT, start);
-    return () => window.removeEventListener(DRAW_EVENT, start);
-  }, [editable, status]);
+    if (!drawOnReady || !editable || status !== "ready" || drewOnReady.current) return;
+    drewOnReady.current = true;
+    // Same as tapping "Draw corners" once the map has loaded.
+    setDrawing([]);
+  }, [drawOnReady, editable, status]);
 
   // One-finger dragging while there's a shape to move; otherwise the page scrolls as usual.
   useEffect(() => {
@@ -187,8 +185,15 @@ export function LotMap({
   const strong = `${button} border-ink bg-ink text-white hover:bg-ink/85`;
 
   return (
-    <div id={editable ? "lot-map" : undefined} className="scroll-mt-4 overflow-hidden rounded-xl border border-line bg-paper">
-      <div className={`relative w-full ${status === "unavailable" ? "h-40" : "h-[58svh] max-h-[620px] min-h-[320px] lg:h-[520px]"}`}>
+    <div
+      id={editable ? "lot-map" : undefined}
+      className={fill ? "flex h-full min-h-0 flex-col bg-paper" : "scroll-mt-4 overflow-hidden rounded-xl border border-line bg-paper"}
+    >
+      <div
+        className={`relative w-full ${
+          fill ? "min-h-0 flex-1" : status === "unavailable" ? "h-40" : "h-[58svh] max-h-[620px] min-h-[320px] lg:h-[520px]"
+        }`}
+      >
         {/* Hidden, not removed, when unavailable: Google draws its own error box in it. */}
         <div ref={element} className={`absolute inset-0 ${status === "unavailable" ? "hidden" : ""}`} role="region" aria-label={`Satellite view of ${address}`} />
         {status === "loading" ? (
@@ -212,7 +217,7 @@ export function LotMap({
       </div>
 
       {status === "ready" && editable ? (
-        <div className="space-y-3 p-3 sm:p-4">
+        <div className={`space-y-3 p-3 sm:p-4 ${fill ? "shrink-0 border-t border-line pb-[max(0.75rem,env(safe-area-inset-bottom))]" : ""}`}>
           {area > 0 && !drawing ? (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-ink">

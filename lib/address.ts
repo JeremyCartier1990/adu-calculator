@@ -50,3 +50,33 @@ export function addressIdentity(input: string): string {
     .map((part) => part.replace(/[^a-z0-9]+/g, ""))
     .join("|");
 }
+
+export type AddressParts = { street: string | null; city: string | null; state: string | null; zipcode: string | null };
+
+/**
+ * "2543 Walnut Ave, Venice, CA 90291, USA" → street, city, state, ZIP. Addresses are
+ * free text, so any part that can't be found is null rather than a guess.
+ */
+export function splitAddress(input: string): AddressParts {
+  const parts = cleanAddress(input)
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length > 0 && /^(usa|us|united states( of america)?)$/i.test(parts[parts.length - 1])) parts.pop();
+  let state: string | null = null;
+  let zipcode: string | null = null;
+  const tail = parts.length > 1 ? parts[parts.length - 1].match(/^([a-z]{2}|california)\.?\s*(\d{5}(?:-\d{4})?)?$/i) : null;
+  if (tail) {
+    state = /^california$/i.test(tail[1]) ? "CA" : tail[1].toUpperCase();
+    zipcode = tail[2] ?? null;
+    parts.pop();
+  } else if (parts.length > 1) {
+    const zipOnly = parts[parts.length - 1].match(/^(\d{5}(?:-\d{4})?)$/);
+    if (zipOnly) {
+      zipcode = zipOnly[1];
+      parts.pop();
+    }
+  }
+  const city = parts.length > 1 ? (parts.pop() ?? null) : null;
+  return { street: parts.length > 0 ? parts.join(", ") : null, city, state, zipcode };
+}

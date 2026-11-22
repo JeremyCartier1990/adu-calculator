@@ -282,6 +282,14 @@ export async function saveReportInputs(
   return "saved";
 }
 
+/** The report, only for the browser holding its edit key. */
+export async function getReportForOwner(id: string, editKey: string): Promise<ReportRecord | "not_found" | "forbidden"> {
+  const found = await getStore().get(id);
+  if (!found) return "not_found";
+  if (!editKeyMatches(editKey, found.editHash)) return "forbidden";
+  return found.report;
+}
+
 export async function getReport(id: string): Promise<ReportRecord | null> {
   if (!isReportId(id)) return null;
   return (await getStore().get(id))?.report ?? null;

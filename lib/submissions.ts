@@ -13,7 +13,8 @@ export type SubmissionOutcome =
   | "verification_required"
   | "store_missing"
   | "pdf_email"
-  | "team_created";
+  | "team_created"
+  | "appointment";
 
 export type Submission = {
   outcome: SubmissionOutcome;
