@@ -422,7 +422,7 @@ function FullReport({ report, estimate, financing, date }: { report: ReportRecor
         <Hero estimate={estimate} summary={summary} />
         {onBest ? (
           <Text style={[s.note, { color: PINE }]}>
-            This is the best setup for this property: the largest {estimate.projectLabel.replace(/^\w/, (letter) => letter.toLowerCase())} the state allows here, with the highest 10-year return.
+            This is the best setup for this property: a {estimate.projectLabel.replace(/^\w/, (letter) => letter.toLowerCase())} sized to fit this lot, on the ADU type with the higher 10-year return.
           </Text>
         ) : null}
 

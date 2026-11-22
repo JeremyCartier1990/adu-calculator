@@ -2,9 +2,10 @@ import { ASSUMPTIONS, bedroomsForSqft, type FinishLevelId, type ProjectTypeId } 
 import { calculateEstimate, fallbackMonthlyRent } from "./calculate";
 
 /**
- * Picks the setup a new report opens on: the ADU type and size with the best
- * 10-year return, inside California's size rules. Garage conversions are left
- * out because public records don't say whether there is a garage.
+ * Picks the setup a new report opens on: a size most lots can actually fit
+ * (500 to 800 sqft, scaled to the lot), then the ADU type with the best
+ * 10-year return at that size. Garage conversions are left out because public
+ * records don't say whether there is a garage.
  */
 
 export type PropertySize = { homeSquareFootage: number | null; homeValue: number | null; lotSize: number | null };
@@ -50,17 +51,39 @@ export function setupGain(setup: Setup, property: PropertySize): number {
   return estimate.equity + rentKept;
 }
 
+/** The opening size stays in the range most backyards fit, whatever the state would allow. */
+export const SUGGESTED_SQFT = { min: 500, max: 800, unknownLot: 600 };
+/** About an eighth of the lot: 4,000 sqft → 500, 5,000 → 600, 6,000 → 700, 6,500 and up → 800. */
+const LOT_SHARE = 0.12;
+
+/** A size that makes sense for the lot, rounded to 50 sqft, between 500 and 800. */
+export function suggestedSqft(lotSize: number | null): number {
+  if (lotSize == null || lotSize <= 0) return SUGGESTED_SQFT.unknownLot;
+  const sized = Math.round((lotSize * LOT_SHARE) / 50) * 50;
+  return Math.min(SUGGESTED_SQFT.max, Math.max(SUGGESTED_SQFT.min, sized));
+}
+
+/** A typical two-car garage; most conversions are about this size. */
+const GARAGE_SQFT = 400;
+
+/**
+ * What a new report opens on: the ADU type the homeowner said they want, at a size that
+ * fits the lot, or the best setup when they aren't sure yet.
+ */
+export function openingSetup(property: PropertySize, interest: ProjectTypeId | null | undefined): Setup {
+  if (!interest) return bestSetup(property);
+  const sqft = interest === "garage_conversion" ? GARAGE_SQFT : Math.min(suggestedSqft(property.lotSize), maxSqftFor(interest, property));
+  return { projectType: interest, finish: FINISH, sqft };
+}
+
 export function bestSetup(property: PropertySize): Setup {
-  const { min, step } = ASSUMPTIONS.size;
-  let best: Setup = { projectType: "detached_adu", finish: FINISH, sqft: ASSUMPTIONS.size.defaults.detached_adu };
+  const target = suggestedSqft(property.lotSize);
+  let best: Setup = { projectType: "detached_adu", finish: FINISH, sqft: target };
   let bestGain = -Infinity;
   for (const projectType of ["detached_adu", "attached_adu"] as const) {
-    const max = maxSqftFor(projectType, property);
-    for (let sqft = min; sqft <= max; sqft += step) {
-      const setup = { projectType, finish: FINISH, sqft };
-      const gain = setupGain(setup, property);
-      if (gain > bestGain) [best, bestGain] = [setup, gain];
-    }
+    const setup = { projectType, finish: FINISH, sqft: Math.min(target, maxSqftFor(projectType, property)) };
+    const gain = setupGain(setup, property);
+    if (gain > bestGain) [best, bestGain] = [setup, gain];
   }
   return best;
 }

@@ -83,3 +83,21 @@ input[type="range"] {
     display: none !important;
   }
 }
+
+/* Funnel steps rise in: a bottom sheet on phones, a soft lift on larger screens. */
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+.step-dialog[open] {
+  animation: step-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-dialog[open] {
+    animation: none;
+  }
+}

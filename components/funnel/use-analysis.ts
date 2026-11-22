@@ -6,7 +6,7 @@ import { ASSUMPTIONS, bedroomsForSqft, normalizeFinish, snapSqft, type FinishLev
 import { fallbackMonthlyRent, scaleNightlyRate, scaleRent, type RentSource } from "@/lib/calculate";
 import { dollars, parseNumber, parsePositive } from "@/lib/money";
 import type { LatLng } from "@/lib/footprint";
-import { bestSetup } from "@/lib/optimize";
+import { bestSetup, openingSetup } from "@/lib/optimize";
 import { useFinancing } from "./use-financing";
 import { estimateReport, parsePropertyFacts, type ConfirmedProperty, type PropertyFacts, type ReportInputs } from "@/lib/report";
 import type { FactKey, Facts } from "./shared";
@@ -25,11 +25,11 @@ type MarketNumbers = { adr: number; occupancy: number };
  * short-term market numbers once the phone is verified, and the estimate.
  */
 export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | null = null, teamReportId: string | null = null) {
-  // A new report opens on the best setup for this property; a saved one reopens as it was left.
+  // A new report opens on the ADU type the homeowner picked, or the best setup; a saved one reopens as it was left.
   const [opening] = useState(() =>
     saved
       ? null
-      : bestSetup({ homeSquareFootage: property.squareFootage, homeValue: property.homeValue, lotSize: property.lotSize }),
+      : openingSetup({ homeSquareFootage: property.squareFootage, homeValue: property.homeValue, lotSize: property.lotSize }, property.interest),
   );
   const [projectType, setProjectTypeState] = useState<ProjectTypeId>(saved?.projectType ?? opening!.projectType);
   const [finish, setFinish] = useState<FinishLevelId>(normalizeFinish(saved?.finish) ?? opening!.finish);

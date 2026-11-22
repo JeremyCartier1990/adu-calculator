@@ -1,7 +1,8 @@
 import Image, { type StaticImageData } from "next/image";
 import { ArrowBox, Eyebrow } from "@/components/eyebrow";
-import { InvestmentSummary } from "@/components/report/investment-summary";
+import { InvestmentSummary, projectPhrase } from "@/components/report/investment-summary";
 import { BRAND } from "@/lib/brand";
+import { formatMoney, formatMoneyCompact } from "@/lib/money";
 import { SAMPLE_PROPERTY, sampleReport } from "@/lib/sample-report";
 import blackCabin from "@/public/adus/black-cabin.jpg";
 import cedarDeck from "@/public/adus/cedar-deck.jpg";
@@ -25,6 +26,32 @@ function StartButton({ children, tone = "dark" }: { children: React.ReactNode; t
   );
 }
 
+/** Floats over the hero's lot: the three numbers a report leads with, for the sample home. */
+export function HeroPreview() {
+  const { estimate, summary } = sampleReport();
+  const rows: Array<[string, string, string]> = [
+    ["You invest", formatMoneyCompact(summary.invest), "text-white"],
+    ["Home gains", `+${formatMoneyCompact(summary.valueAdded)}`, "text-[#7fd6a8]"],
+    ["You keep monthly", formatMoney(summary.longTerm), "text-[#7fd6a8]"],
+  ];
+  return (
+    <div className="rounded-xl bg-ink/90 p-4 text-left text-white shadow-[0_24px_60px_rgba(12,13,12,0.35)] backdrop-blur-md">
+      <p className="text-[11px] text-white/60">
+        <span className="font-semibold uppercase tracking-[0.12em]">Sample report</span> · {projectPhrase(estimate)}, Los Angeles
+      </p>
+      <dl className="mt-3 grid grid-cols-3 gap-2">
+        {rows.map(([label, value, tone]) => (
+          <div key={label} className="min-w-0 rounded-lg bg-white/[0.07] px-2.5 py-2">
+            <dt className="text-[11px] leading-4 text-white/60">{label}</dt>
+            <dd className={`mt-1 truncate font-display text-base tabular-nums sm:text-lg ${tone}`}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2.5 text-xs text-white/60">Yours uses your address, your home&apos;s records, and rent near you.</p>
+    </div>
+  );
+}
+
 const SOURCES = [
   { title: "Property records", text: "Home size, lot, beds, baths, and value for your address" },
   { title: "Rent comps", text: "Long-term rent for an ADU near you, from RentCast" },
@@ -33,27 +60,26 @@ const SOURCES = [
   { title: "California ADU rules", text: "The largest unit the state lets you build on your lot" },
 ];
 
-/** Under the hero: where the numbers come from, so the report reads as data, not a sales pitch. */
+/** Where the numbers come from, so the report reads as data, not a sales pitch. */
 export function DataSources() {
   return (
-    <section className="mx-auto max-w-[1400px] px-4 pt-10 sm:px-6 md:pt-14" aria-labelledby="sources-heading">
-      <h2 id="sources-heading" className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-ink-soft">
-        Built from real data on your address
-      </h2>
-      <ul className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {SOURCES.map((source, index) => (
-          <li
-            key={source.title}
-            className={`rounded-xl border border-line bg-surface p-4 ${index === SOURCES.length - 1 ? "col-span-2 sm:col-span-1" : ""}`}
-          >
-            <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <Check />
-              {source.title}
-            </p>
-            <p className="mt-1.5 text-sm leading-5 text-ink-soft">{source.text}</p>
-          </li>
-        ))}
-      </ul>
+    <section className="mx-auto max-w-[1400px] px-4 pb-16 sm:px-6 md:pb-24" aria-labelledby="sources-heading">
+      <div className="rounded-2xl border border-line bg-surface p-5 sm:p-8">
+        <h2 id="sources-heading" className="font-display text-2xl leading-tight sm:text-3xl">
+          Built from real data on your address
+        </h2>
+        <ul className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-5">
+          {SOURCES.map((source) => (
+            <li key={source.title} className="flex gap-3 lg:block">
+              <Check className="mt-1 text-pine lg:mt-0" />
+              <div className="lg:mt-3">
+                <p className="text-sm font-semibold text-ink">{source.title}</p>
+                <p className="mt-0.5 text-sm leading-5 text-ink-soft">{source.text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
@@ -67,7 +93,7 @@ export function Check({ className = "text-pine" }: { className?: string }) {
 }
 
 const INSIDE = [
-  { title: "The best setup for your lot", text: "The ADU type and size with the best 10-year return, within California's size limits." },
+  { title: "The best setup for your lot", text: "A size that fits your lot, on the ADU type with the best 10-year return." },
   { title: "What it costs, line by line", text: "Construction, architectural plans, and city permits at current rates for your finish." },
   { title: "What it adds to your home", text: "Your home's value before and after, and how much more it's worth than it costs." },
   { title: "Rent: lease vs. short-term", text: "Monthly rent, nightly rate, occupancy, and what each leaves you after expenses." },
@@ -218,7 +244,7 @@ export function Designs() {
           </h2>
         </div>
         <p className="max-w-sm text-base leading-7 text-ink-soft">
-          It opens on the setup with the best return for your lot. Switch to a garage conversion, an attached unit, or a different size
+          It opens on a size that fits your lot and the ADU type with the best return. Switch to a garage conversion, an attached unit, or a different size
           and every number updates.
         </p>
       </div>

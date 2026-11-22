@@ -4,14 +4,14 @@ import { ATTRIBUTION_KEYS, type Attribution } from "./attribution";
 import { bedroomsForSqft, projectTitle } from "./assumptions";
 import { BRAND } from "./brand";
 import { calculateEstimate, fallbackMonthlyRent } from "./calculate";
-import { bestSetup } from "./optimize";
+import { openingSetup } from "./optimize";
 import type { ReportRecord } from "./report";
 
 /** What the report opens on, priced with planning rents, so the team sees the pitch before opening it. */
 function openingEstimate(report: ReportRecord) {
   const { property } = report;
   const size = { homeSquareFootage: property.squareFootage, homeValue: property.homeValue, lotSize: property.lotSize };
-  const setup = bestSetup(size);
+  const setup = openingSetup(size, property.interest);
   const estimate = calculateEstimate({
     ...setup,
     monthlyRent: fallbackMonthlyRent(setup.sqft, bedroomsForSqft(setup.sqft)),
@@ -68,6 +68,7 @@ export function leadPayload(report: ReportRecord, attribution: Attribution | nul
       data_source: property.source === "rentcast" ? "public_records" : "entered_by_homeowner",
       edited_fields: property.edited,
     },
+    adu_interest: property.interest ? projectTitle(property.interest) : "Not sure yet",
     estimate: openingEstimate(report),
     utm,
     redtrack_click_id: attribution?.rtkcid ?? null,

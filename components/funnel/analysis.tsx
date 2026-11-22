@@ -199,7 +199,7 @@ export function AnalysisSection({
           <div className="mt-5 flex flex-col gap-3 rounded-xl border border-white/15 px-4 py-3 text-sm text-white/80 sm:flex-row sm:items-center sm:justify-between">
             <p className="leading-6">
               {analysis.onBest
-                ? `This is the best setup for this property: a ${projectPhrase(estimate)}, the biggest the state allows here, with the highest ${BEST_SETUP_YEARS}-year return. You can change anything.`
+                ? `This is the best setup for this property: a ${projectPhrase(estimate)}, a size that fits this lot, on the ADU type with the higher ${BEST_SETUP_YEARS}-year return. You can change anything.`
                 : `The best setup for this property is a ${analysis.best.sqft.toLocaleString("en-US")} sqft ${projectTitle(analysis.best.projectType).toLowerCase().replace("adu", "ADU")} with a standard finish.`}
             </p>
             {analysis.onBest ? null : (

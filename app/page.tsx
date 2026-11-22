@@ -1,5 +1,5 @@
 import { Funnel } from "@/components/funnel/funnel";
-import { DataSources, Designs, Faq, FinalCta, HowItWorks, SampleReport } from "@/components/landing";
+import { DataSources, Designs, Faq, FinalCta, HeroPreview, HowItWorks, SampleReport } from "@/components/landing";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
@@ -8,10 +8,10 @@ export default function HomePage() {
     <div id="top" className="max-md:pb-20">
       <SiteHeader />
       <main>
-        <Funnel />
-        <DataSources />
+        <Funnel preview={<HeroPreview />} />
         <SampleReport />
         <HowItWorks />
+        <DataSources />
         <Designs />
         <Faq />
         <FinalCta />

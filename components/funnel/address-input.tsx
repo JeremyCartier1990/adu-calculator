@@ -73,6 +73,12 @@ export function AddressInput({
 
   return (
     <div className="relative w-full">
+      {light ? (
+        <svg viewBox="0 0 20 20" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-pine" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+          <path d="M10 18s-5.5-5.2-5.5-9.5a5.5 5.5 0 0111 0C15.5 12.8 10 18 10 18z" strokeLinejoin="round" />
+          <circle cx="10" cy="8.5" r="2" />
+        </svg>
+      ) : null}
       <input
         ref={inputRef}
         id="property-address"
@@ -111,7 +117,7 @@ export function AddressInput({
         }}
         className={`w-full border px-5 text-base outline-none transition ${
           light
-            ? "min-h-13 rounded-lg border-transparent bg-transparent text-ink placeholder:text-ink-soft focus:bg-paper"
+            ? "min-h-14 rounded-lg border-transparent bg-transparent pl-11 text-ink placeholder:text-ink-soft focus:bg-paper"
             : "min-h-14 rounded-full border-line bg-white text-ink placeholder:text-ink-soft focus:border-ink focus:ring-4 focus:ring-ink/10"
         } ${invalid ? "border-clay" : ""}`}
       />

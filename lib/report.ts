@@ -1,4 +1,4 @@
-import { ASSUMPTIONS, normalizeFinish, type ProjectTypeId } from "./assumptions";
+import { ASSUMPTIONS, normalizeFinish, PROJECT_TYPES, type ProjectTypeId } from "./assumptions";
 import { calculateEstimate, type Estimate, type EstimateInput, type RentSource, type RentalUse } from "./calculate";
 import { validateAddress } from "./address";
 import { cleanText } from "./lead";
@@ -21,6 +21,8 @@ export type ConfirmedProperty = {
   /** Where the facts came from, and which ones the homeowner changed. */
   source: "rentcast" | "manual";
   edited: string[];
+  /** The ADU type the homeowner said they're thinking of; missing or null means not sure yet. */
+  interest?: ProjectTypeId | null;
 };
 
 /** What the homeowner picked in the calculator; the estimate is recomputed from this on the server. */
@@ -83,6 +85,7 @@ export function parseConfirmedProperty(input: unknown, { californiaOnly = true }
     longitude: bounded(data.longitude, -180, 180),
     source: data.source === "rentcast" ? "rentcast" : "manual",
     edited,
+    interest: PROJECT_TYPES.some((project) => project.id === data.interest) ? (data.interest as ProjectTypeId) : null,
   };
 }
 

@@ -10,16 +10,19 @@ import { trackLeadConversion } from "@/lib/redtrack";
 import { rememberEditKey } from "@/lib/report-keys";
 import { validateAddress } from "@/lib/address";
 import type { PropertyLookup } from "@/lib/api-types";
-import { bedroomsForSqft, projectTitle } from "@/lib/assumptions";
+import { bedroomsForSqft, projectTitle, type ProjectTypeId } from "@/lib/assumptions";
 import { BRAND } from "@/lib/brand";
 import { calculateEstimate, fallbackMonthlyRent } from "@/lib/calculate";
 import { formatMoney, formatNumber, parsePositive } from "@/lib/money";
-import { bestSetup } from "@/lib/optimize";
+import { openingSetup } from "@/lib/optimize";
 import type { ConfirmedProperty } from "@/lib/report";
 import { EMPTY_FACTS, FACT_FIELDS, formatUsPhone, postJson, UsFlag, type FactKey, type Facts, type SavedReport } from "./shared";
 
 type Step = "address" | "confirm" | "contact" | "analysis";
-export function Funnel() {
+// While the lookup runs, the button says what's happening, so the wait reads as work being done.
+const LOOKUP_STEPS = ["Finding your home…", "Reading property records…", "Checking ADU rules for your lot…"];
+
+export function Funnel({ preview }: { preview?: React.ReactNode }) {
   const [step, setStep] = useState<Step>("address");
   const [address, setAddress] = useState("");
   const [addressError, setAddressError] = useState<string | null>(null);
@@ -27,11 +30,21 @@ export function Funnel() {
   const [lookupNote, setLookupNote] = useState<string | null>(null);
   const [facts, setFacts] = useState<Facts>(EMPTY_FACTS);
   const [edited, setEdited] = useState<Set<FactKey>>(new Set());
+  const [interest, setInterest] = useState<ProjectTypeId | null>(null);
   const [lookup, setLookup] = useState<Extract<PropertyLookup, { ok: true }> | null>(null);
   const [property, setProperty] = useState<ConfirmedProperty | null>(null);
   const [report, setReport] = useState<SavedReport | null>(null);
   const [saveNote, setSaveNote] = useState<string | null>(null);
   const addressRef = useRef<HTMLInputElement>(null);
+  const [lookupStep, setLookupStep] = useState(0);
+  useEffect(() => {
+    if (!looking) return;
+    const timer = setInterval(() => setLookupStep((at) => Math.min(at + 1, LOOKUP_STEPS.length - 1)), 1400);
+    return () => {
+      clearInterval(timer);
+      setLookupStep(0);
+    };
+  }, [looking]);
 
   async function startLookup(raw: string) {
     const parsed = validateAddress(raw);
@@ -93,6 +106,7 @@ export function Funnel() {
       longitude: lookup?.property.longitude ?? null,
       source: lookup ? "rentcast" : "manual",
       edited: [...edited],
+      interest,
     });
     setStep("contact");
   }
@@ -139,7 +153,7 @@ export function Funnel() {
 
   return (
     <>
-      <Hero>
+      <Hero preview={step === "address" ? preview : null}>
         <form
           ref={formRef}
           className="flex flex-col gap-2 rounded-xl border border-line bg-white p-2 shadow-[0_24px_60px_rgba(31,30,27,0.14)] sm:flex-row"
@@ -162,7 +176,7 @@ export function Funnel() {
             className="inline-flex min-h-13 shrink-0 items-center justify-center gap-3 rounded-lg bg-ink py-2 pl-2 pr-5 text-base font-medium text-white transition hover:bg-ink/85 disabled:cursor-wait disabled:opacity-80"
           >
             <ArrowBox />
-            {looking ? "Finding your home…" : "Get my free report"}
+            {looking ? LOOKUP_STEPS[lookupStep] : "Get my free report"}
           </button>
         </form>
         {addressError ? (
@@ -170,8 +184,8 @@ export function Funnel() {
             {addressError}
           </p>
         ) : (
-          <ul className="mt-3 inline-flex flex-wrap justify-center gap-x-4 gap-y-1 rounded-md bg-paper/85 px-3 py-1.5 text-sm text-ink-soft backdrop-blur">
-            {["100% free", "About a minute", "No obligation"].map((item) => (
+          <ul className="mt-3 inline-flex flex-wrap justify-center gap-x-3 gap-y-1 rounded-md bg-paper/85 px-3 py-1.5 text-[13px] text-ink-soft backdrop-blur sm:gap-x-4 sm:text-sm">
+            {["100% free", "1 minute", "No obligation"].map((item) => (
               <li key={item} className="flex items-center gap-1.5">
                 <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-pine" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3.5 8.5l3 3 6-7" />
@@ -189,6 +203,8 @@ export function Funnel() {
           fromRecords={Boolean(lookup)}
           note={lookupNote}
           facts={facts}
+          interest={interest}
+          onInterest={setInterest}
           onFact={(key, value) => {
             setFacts((current) => ({ ...current, [key]: value }));
             setEdited((current) => new Set(current).add(key));
@@ -239,20 +255,22 @@ function StepDialog({ open, onClose, label, children }: { open: boolean; onClose
         event.preventDefault();
         onClose();
       }}
-      className="m-auto max-h-[92svh] w-[min(560px,calc(100vw-24px))] overflow-y-auto rounded-[28px] border border-line bg-surface p-0 text-ink shadow-[0_40px_120px_rgba(12,13,12,0.35)] backdrop:bg-ink/55 backdrop:backdrop-blur-sm"
+      className="step-dialog m-auto max-h-[92svh] w-[min(560px,calc(100vw-24px))] overflow-y-auto rounded-[28px] border border-line bg-surface p-0 text-ink shadow-[0_40px_120px_rgba(12,13,12,0.35)] backdrop:bg-ink/55 backdrop:backdrop-blur-sm max-sm:mb-0 max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]"
     >
       {open ? children : null}
     </dialog>
   );
 }
 
-function Progress({ at }: { at: 1 | 2 }) {
+/** The address counts as step one, so the visitor opens the first dialog already a third of the way in. */
+function Progress({ at }: { at: 2 | 3 }) {
   return (
     <div className="flex items-center gap-3 text-xs font-medium text-ink-soft">
-      <span>Step {at} of 2</span>
+      <span>Step {at} of 3</span>
       <span className="flex flex-1 gap-1.5" aria-hidden="true">
-        <span className="h-1 flex-1 rounded-full bg-ink" />
-        <span className={`h-1 flex-1 rounded-full ${at === 2 ? "bg-ink" : "bg-line"}`} />
+        {[1, 2, 3].map((index) => (
+          <span key={index} className={`h-1 flex-1 rounded-full ${index < at ? "bg-pine" : index === at ? "bg-ink" : "bg-line"}`} />
+        ))}
       </span>
     </div>
   );
@@ -263,6 +281,8 @@ function ConfirmStep({
   fromRecords,
   note,
   facts,
+  interest,
+  onInterest,
   onFact,
   onChangeAddress,
   onConfirm,
@@ -271,6 +291,8 @@ function ConfirmStep({
   fromRecords: boolean;
   note: string | null;
   facts: Facts;
+  interest: ProjectTypeId | null;
+  onInterest: (interest: ProjectTypeId | null) => void;
   onFact: (key: FactKey, value: string) => void;
   onChangeAddress: () => void;
   onConfirm: () => void;
@@ -278,11 +300,6 @@ function ConfirmStep({
   // Records found: show them as a summary, one tap to accept. Nothing found: the fields, all optional.
   const [editing, setEditing] = useState(!fromRecords);
   const known = FACT_FIELDS.filter((field) => facts[field.key].trim() !== "");
-  const best = bestSetup({
-    homeSquareFootage: parsePositive(facts.squareFootage),
-    homeValue: parsePositive(facts.homeValue),
-    lotSize: parsePositive(facts.lotSize),
-  });
   return (
     <form
       className="p-5 sm:p-8"
@@ -291,7 +308,7 @@ function ConfirmStep({
         onConfirm();
       }}
     >
-      <Progress at={1} />
+      <Progress at={2} />
       <h2 className="mt-5 font-display text-3xl leading-tight sm:text-4xl">{fromRecords ? "We found your home" : "Tell us about your home"}</h2>
       <div className="mt-4 flex items-start justify-between gap-4 rounded-2xl bg-paper px-4 py-3">
         <p className="text-sm font-medium leading-6">{address}</p>
@@ -343,13 +360,26 @@ function ConfirmStep({
         </>
       )}
 
-      <p className="mt-4 flex items-start gap-2.5 rounded-2xl bg-pine/10 px-4 py-3 text-sm leading-6 text-ink">
-        <Sparkle />
-        <span>
-          Best fit for this lot: a <strong className="font-semibold">{formatNumber(best.sqft)} sqft {projectTitle(best.projectType).toLowerCase().replace("adu", "ADU")}</strong>. Your report
-          opens on it, and you can change anything.
-        </span>
-      </p>
+      <fieldset className="mt-5 min-w-0">
+        <legend className="text-sm font-medium">What are you thinking of building?</legend>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {INTERESTS.map((option) => (
+            <label key={option.label} className="relative">
+              <input
+                type="radio"
+                name="interest"
+                className="peer sr-only"
+                checked={interest === option.id}
+                onChange={() => onInterest(option.id)}
+              />
+              <span className="flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-line bg-white px-3 text-center text-sm font-medium leading-5 peer-checked:border-ink peer-checked:bg-ink peer-checked:text-white peer-focus-visible:ring-4 peer-focus-visible:ring-ink/15">
+                {option.label}
+              </span>
+            </label>
+          ))}
+        </div>
+        <p className="mt-2 text-xs leading-5 text-ink-soft">Not sure? Your report opens on the type with the best return, and compares the others.</p>
+      </fieldset>
 
       <button
         type="submit"
@@ -362,18 +392,17 @@ function ConfirmStep({
   );
 }
 
-function Sparkle() {
-  return (
-    <svg viewBox="0 0 16 16" className="mt-1 h-4 w-4 shrink-0 text-pine" fill="currentColor" aria-hidden="true">
-      <path d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z" />
-    </svg>
-  );
-}
+const INTERESTS: Array<{ id: ProjectTypeId | null; label: string }> = [
+  { id: null, label: "Not sure yet" },
+  { id: "detached_adu", label: "Backyard ADU" },
+  { id: "attached_adu", label: "Attached ADU" },
+  { id: "garage_conversion", label: "Garage conversion" },
+];
 
 /** What the report will say, from planning rents, shown blurred until the phone is confirmed. */
 function ReportTeaser({ property }: { property: ConfirmedProperty }) {
   const size = { homeSquareFootage: property.squareFootage, homeValue: property.homeValue, lotSize: property.lotSize };
-  const setup = bestSetup(size);
+  const setup = openingSetup(size, property.interest);
   const estimate = calculateEstimate({
     ...setup,
     monthlyRent: fallbackMonthlyRent(setup.sqft, bedroomsForSqft(setup.sqft)),
@@ -391,7 +420,7 @@ function ReportTeaser({ property }: { property: ConfirmedProperty }) {
   return (
     <div className="mt-4 rounded-2xl bg-ink p-4 text-white">
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">
-        Your report · {formatNumber(setup.sqft)} sqft {projectTitle(setup.projectType).toLowerCase().replace("adu", "ADU")}
+        Your report · {property.interest ? `${formatNumber(setup.sqft)} sqft ${projectTitle(setup.projectType).toLowerCase().replace("adu", "ADU")}` : property.address.split(",")[0]}
       </p>
       <dl className="mt-3 grid grid-cols-3 gap-2">
         {rows.map(([label, value]) => (
@@ -542,7 +571,7 @@ function ContactStep({
         else void submit();
       }}
     >
-      <Progress at={2} />
+      <Progress at={3} />
       <h2 className="mt-5 font-display text-3xl leading-tight sm:text-4xl">Your report is ready</h2>
       <ReportTeaser property={property} />
       <p className="mt-4 text-sm leading-6 text-ink-soft">
