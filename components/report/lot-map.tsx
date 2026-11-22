@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ASSUMPTIONS } from "@/lib/assumptions";
-import { areaSqft, centroid, rectangleFootprint, rotateFootprint, sideLengthsFt, type LatLng } from "@/lib/footprint";
+import { areaSqft, centroid, footprintSqft, rectangleFootprint, rotateFootprint, sideLengthsFt, type LatLng } from "@/lib/footprint";
 import { loadGoogleMaps, onMapsAuthFailure, type GListener, type GMap, type GMaps, type GShape } from "@/lib/google-maps";
 
 const TEAL = "#5fc2b8";
@@ -82,6 +82,8 @@ export function LotMap({
           keyboardShortcuts: false,
           gestureHandling: "cooperative",
         });
+        // A pin on the address, so it's clear which building on the block is the property.
+        new google.Marker({ position: { lat: latitude, lng: longitude }, map: map.current, title: address, clickable: false, zIndex: 1 });
         setStatus("ready");
       })
       .catch(() => !cancelled && setStatus("unavailable"));
@@ -170,7 +172,7 @@ export function LotMap({
     area > 0 && (area < ASSUMPTIONS.size.min || area > ASSUMPTIONS.size.max)
       ? `ADU estimates cover ${ASSUMPTIONS.size.min.toLocaleString("en-US")}–${ASSUMPTIONS.size.max.toLocaleString("en-US")} sqft.`
       : null;
-  const usable = Math.min(ASSUMPTIONS.size.max, Math.max(ASSUMPTIONS.size.min, Math.round(area / ASSUMPTIONS.size.step) * ASSUMPTIONS.size.step));
+  const usable = shape && shape.length >= 3 ? footprintSqft(shape) : ASSUMPTIONS.size.min;
 
   function place() {
     const center = map.current?.getCenter();

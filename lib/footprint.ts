@@ -1,3 +1,5 @@
+import { ASSUMPTIONS } from "./assumptions";
+
 // ADU footprint geometry on a lot. At lot scale (tens of meters) the earth is
 // flat enough to measure in local meters around the shape's first point.
 
@@ -21,6 +23,12 @@ function toLocal(points: LatLng[], origin: LatLng): Point[] {
 function toLatLng(points: Point[], origin: LatLng): LatLng[] {
   const s = scale(origin);
   return points.map((p) => ({ lat: origin.lat + p.y / s.y, lng: origin.lng + p.x / s.x }));
+}
+
+/** A drawn shape's area as an ADU size: rounded to the size step and kept inside the range the estimates cover. */
+export function footprintSqft(points: LatLng[]): number {
+  const { min, max, step } = ASSUMPTIONS.size;
+  return Math.min(max, Math.max(min, Math.round(areaSqft(points) / step) * step));
 }
 
 /** Area of a drawn shape in square feet (shoelace formula). */

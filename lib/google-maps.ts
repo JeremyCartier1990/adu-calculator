@@ -22,6 +22,7 @@ export type GMaps = {
   Map: new (element: HTMLElement, options: Record<string, unknown>) => GMap;
   Polygon: new (options: Record<string, unknown>) => GShape;
   Polyline: new (options: Record<string, unknown>) => GShape;
+  Marker: new (options: Record<string, unknown>) => { setMap(map: GMap | null): void };
   LatLngBounds: new () => { extend(point: { lat: number; lng: number }): void };
 };
 

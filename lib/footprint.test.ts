@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { areaSqft, parseFootprint, rectangleFootprint, rotateFootprint, sideLengthsFt } from "./footprint";
+import { areaSqft, footprintSqft, parseFootprint, rectangleFootprint, rotateFootprint, sideLengthsFt } from "./footprint";
 
 const VENICE = { lat: 33.991974, lng: -118.4481 };
 
@@ -29,4 +29,10 @@ test("only sensible saved shapes are accepted", () => {
   assert.equal(parseFootprint("nope"), null);
   assert.equal(parseFootprint([{ lat: 100, lng: 0 }, { lat: 0, lng: 0 }, { lat: 1, lng: 1 }]), null);
   assert.equal(parseFootprint(rectangleFootprint(VENICE, 500))?.length, 4);
+});
+
+test("a drawn shape's size is rounded to the size step and kept in range", () => {
+  assert.equal(footprintSqft(rectangleFootprint(VENICE, 752)), 750);
+  assert.equal(footprintSqft(rectangleFootprint(VENICE, 150)), 300);
+  assert.equal(footprintSqft(rectangleFootprint(VENICE, 2000)), 1200);
 });

@@ -5,7 +5,7 @@ import type { RentLookup } from "@/lib/api-types";
 import { ASSUMPTIONS, bedroomsForSqft, normalizeFinish, snapSqft, type FinishLevelId, type ProjectTypeId } from "@/lib/assumptions";
 import { fallbackMonthlyRent, scaleNightlyRate, scaleRent, type RentSource } from "@/lib/calculate";
 import { dollars, parseNumber, parsePositive } from "@/lib/money";
-import type { LatLng } from "@/lib/footprint";
+import { footprintSqft, type LatLng } from "@/lib/footprint";
 import { bestSetup, openingSetup } from "@/lib/optimize";
 import { useFinancing, type ValueRaised } from "./use-financing";
 import { estimateReport, parsePropertyFacts, type ConfirmedProperty, type PropertyFacts, type ReportInputs } from "@/lib/report";
@@ -182,7 +182,14 @@ export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | n
     projectType,
     setProjectType(next: ProjectTypeId) {
       setProjectTypeState(next);
-      setSqft(ASSUMPTIONS.size.defaults[next]);
+      // A garage conversion reuses the garage, so a unit drawn in the yard no longer applies.
+      if (next === "garage_conversion") {
+        setFootprint(null);
+        setSqft(ASSUMPTIONS.size.defaults[next]);
+        return;
+      }
+      // Attached or detached, a unit drawn on the map keeps its size.
+      setSqft(footprint && footprint.length >= 3 ? footprintSqft(footprint) : ASSUMPTIONS.size.defaults[next]);
     },
     finish,
     setFinish,
