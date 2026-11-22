@@ -1,5 +1,5 @@
 import { splitAddress } from "./address";
-import { dayLabel, TIME_ZONE, windowFor, type Appointment } from "./appointment";
+import { dayLabel, endTime, meetingType, TIME_ZONE, timeLabel, type Appointment } from "./appointment";
 import { ATTRIBUTION_KEYS, type Attribution } from "./attribution";
 import { bedroomsForSqft, projectTitle } from "./assumptions";
 import { BRAND } from "./brand";
@@ -83,17 +83,19 @@ export async function sendLeadWebhook(report: ReportRecord, attribution: Attribu
 }
 
 export function appointmentPayload(report: ReportRecord, appointment: Appointment, attribution: Attribution | null) {
-  const window = windowFor(appointment.window);
+  const end = endTime(appointment.type, appointment.time);
   return {
     ...leadPayload(report, attribution),
     event: "appointment.requested",
     appointment: {
       date: appointment.date,
       day: dayLabel(appointment.date, "long"),
-      window: window.id,
-      window_label: `${window.label}, ${window.hours}`,
-      start_time: window.start,
-      end_time: window.end,
+      meeting_type: appointment.type,
+      meeting_location: appointment.type === "onsite" ? report.property.address : "Video call",
+      duration_minutes: meetingType(appointment.type).minutes,
+      start_time: appointment.time,
+      end_time: end,
+      time_label: `${timeLabel(appointment.time)} – ${timeLabel(end)} Pacific`,
       time_zone: TIME_ZONE,
       note: appointment.note,
       requested_at: new Date().toISOString(),
@@ -101,7 +103,7 @@ export function appointmentPayload(report: ReportRecord, appointment: Appointmen
   };
 }
 
-/** POST a call request to LEAD_WEBHOOK_URL, with the same lead fields as the new-lead event. */
+/** POST a meeting request to LEAD_WEBHOOK_URL, with the same lead fields as the new-lead event. */
 export async function sendAppointmentWebhook(report: ReportRecord, appointment: Appointment, attribution: Attribution | null): Promise<void> {
   await postWebhook(report.id, appointmentPayload(report, appointment, attribution));
 }

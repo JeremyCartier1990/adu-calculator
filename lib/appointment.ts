@@ -1,18 +1,46 @@
-// Call requests from the report: a day and a time window in Pacific time.
-// The team confirms by phone, so this only has to be a clear, valid request.
+// Meeting requests from the report: online or at the property, a day, and a start time in Pacific time.
+// The team confirms by email, so this only has to be a clear, valid request.
 
 export const TIME_ZONE = "America/Los_Angeles";
 /** How many bookable days are offered, starting tomorrow. Sundays are skipped. */
 export const BOOKING_DAYS = 10;
 
-export const WINDOWS = [
-  { id: "morning", label: "Morning", hours: "9 am – 12 pm", start: "09:00", end: "12:00" },
-  { id: "midday", label: "Midday", hours: "12 – 3 pm", start: "12:00", end: "15:00" },
-  { id: "afternoon", label: "Afternoon", hours: "3 – 6 pm", start: "15:00", end: "18:00" },
+/** Online is a 30-minute video call; on site, an expert spends about an hour at the property. Online comes first. */
+export const MEETING_TYPES = [
+  { id: "online", label: "Online", detail: "Video call", minutes: 30 },
+  { id: "onsite", label: "At my property", detail: "Site visit", minutes: 60 },
 ] as const;
 
-export type WindowId = (typeof WINDOWS)[number]["id"];
-export type Appointment = { date: string; window: WindowId; note: string | null };
+export type MeetingType = (typeof MEETING_TYPES)[number]["id"];
+
+export const meetingType = (id: MeetingType) => MEETING_TYPES.find((type) => type.id === id)!;
+
+// Meetings start on the half hour from 10 am, and every one ends by 6 pm.
+const FIRST_START = 10 * 60;
+const LAST_END = 18 * 60;
+const SLOT_MINUTES = 30;
+
+const hhmm = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+/** Start times as HH:MM: 10:00 to 17:30 online, 10:00 to 17:00 on site. */
+export function startTimes(type: MeetingType): string[] {
+  const count = (LAST_END - meetingType(type).minutes - FIRST_START) / SLOT_MINUTES + 1;
+  return Array.from({ length: count }, (_, i) => hhmm(FIRST_START + i * SLOT_MINUTES));
+}
+
+export type Appointment = { type: MeetingType; date: string; time: string; note: string | null };
+
+/** "10:30 am" for "10:30". */
+export function timeLabel(time: string): string {
+  const [hours, minutes] = time.split(":").map(Number);
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, "0")} ${hours < 12 ? "am" : "pm"}`;
+}
+
+/** When a meeting starting at `time` ends, as HH:MM. */
+export function endTime(type: MeetingType, time: string): string {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hhmm(hours * 60 + minutes + meetingType(type).minutes);
+}
 
 /** Today's date in Pacific time, as YYYY-MM-DD. */
 export function pacificToday(now = new Date()): string {
@@ -48,16 +76,15 @@ export function dayLabel(date: string, style: "short" | "long" = "short"): strin
   });
 }
 
-export function windowFor(id: WindowId) {
-  return WINDOWS.find((window) => window.id === id)!;
-}
-
 export function parseAppointment(input: unknown, now = new Date()): Appointment | null {
   if (!input || typeof input !== "object") return null;
   const record = input as Record<string, unknown>;
   const date = typeof record.date === "string" ? record.date : "";
-  const window = WINDOWS.find((option) => option.id === record.window)?.id;
-  if (!window || !bookableDays(now).includes(date)) return null;
+  // Requests from before the choice existed were all online.
+  const type = record.type === undefined ? "online" : MEETING_TYPES.find((option) => option.id === record.type)?.id;
+  if (!type) return null;
+  const time = startTimes(type).find((start) => start === record.time);
+  if (!time || !bookableDays(now).includes(date)) return null;
   const note = typeof record.note === "string" && record.note.trim() ? record.note.trim().slice(0, 500) : null;
-  return { date, window, note };
+  return { type, date, time, note };
 }

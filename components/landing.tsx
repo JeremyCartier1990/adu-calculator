@@ -355,7 +355,7 @@ const FAQ = [
   },
   {
     q: "Do I have to talk to a salesperson?",
-    a: "No. The report is built for you to use on your own: your numbers open right away, and you can change the ADU type, size, finish, rent and financing yourself. If you want to go over it with our team, you can book a call from the report. That part is up to you.",
+    a: "No. The report is built for you to use on your own: your numbers open right away, and you can change the ADU type, size, finish, rent and financing yourself. If you want to go over it with our team, you can book a free online meeting from the report. That part is up to you.",
   },
   {
     q: "Why do you ask for my phone number?",

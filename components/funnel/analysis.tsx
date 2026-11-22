@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowBox, Eyebrow } from "@/components/eyebrow";
 import { Field, FinancingSection } from "@/components/funnel/financing-section";
-import { ScheduleCall } from "@/components/funnel/schedule-call";
+import { MeetingDialog, meetingButtonLabel, MeetingPitch, useMeetingRequest, VideoIcon, type MeetingRequest } from "@/components/funnel/schedule-call";
 import { FACT_FIELDS } from "@/components/funnel/shared";
 import { useAnalysis } from "@/components/funnel/use-analysis";
 import { CalculationBreakdown } from "@/components/report/calculation-breakdown";
@@ -62,6 +62,8 @@ export function AnalysisSection({
 
   // The lot map opens full screen: "open" to look and place, "draw" to start tapping corners.
   const [map, setMap] = useState<"open" | "draw" | null>(null);
+  // The team's view has no booking: the homeowner books, from their own report.
+  const meeting = useMeetingRequest(report && !team ? report : null);
 
   function toggleEditing(next: boolean) {
     setEditing(next);
@@ -116,6 +118,7 @@ export function AnalysisSection({
           summary={summary}
           className={`${editing ? "" : "max-lg:hidden"} ${summaryGone ? "" : "lg:hidden"}`}
           onDone={editing ? () => toggleEditing(false) : null}
+          meeting={meeting.report ? meeting : null}
         />
       ) : null}
       <div className="overflow-hidden rounded-2xl border border-line bg-surface">
@@ -137,12 +140,14 @@ export function AnalysisSection({
             {report && reportUrl ? (
               <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 {team ? null : (
-                  <a
-                    href="#book-call"
-                    className="col-span-2 inline-flex min-h-12 items-center justify-center rounded-lg border border-pine bg-pine/10 px-5 text-sm font-semibold text-ink hover:bg-pine/15"
+                  <button
+                    type="button"
+                    onClick={() => meeting.setOpen(true)}
+                    className="col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-pine px-5 text-sm font-semibold text-white hover:bg-pine/90"
                   >
-                    Book a call about this report
-                  </a>
+                    <VideoIcon />
+                    {meetingButtonLabel(meeting)}
+                  </button>
                 )}
                 <button
                   type="button"
@@ -214,9 +219,9 @@ export function AnalysisSection({
           </div>
         </div>
 
-        {report && !team ? (
+        {meeting.report ? (
           <div className={reportOnly}>
-            <ScheduleCall report={report} />
+            <MeetingPitch meeting={meeting} />
           </div>
         ) : null}
 
@@ -530,22 +535,46 @@ export function AnalysisSection({
         canPlace={analysis.projectType !== "garage_conversion"}
       />
 
+      <MeetingDialog meeting={meeting} />
+
       {editing ? null : (
-        <button
-          type="button"
-          onClick={() => toggleEditing(true)}
-          className="fixed inset-x-4 bottom-4 z-30 inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-white shadow-lg ring-1 ring-white/25 lg:hidden"
-        >
-          <PencilIcon />
-          Edit the numbers
-        </button>
+        <div className="fixed inset-x-3 bottom-3 z-30 flex gap-2 pb-[env(safe-area-inset-bottom)] lg:hidden">
+          <button
+            type="button"
+            onClick={() => toggleEditing(true)}
+            className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-white shadow-lg ring-1 ring-white/25 ${meeting.report ? "shrink-0" : "flex-1"}`}
+          >
+            <PencilIcon />
+            {meeting.report ? "Edit" : "Edit the numbers"}
+          </button>
+          {meeting.report ? (
+            <button
+              type="button"
+              onClick={() => meeting.setOpen(true)}
+              className="inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-white shadow-lg ring-1 ring-white/25"
+            >
+              <VideoIcon />
+              <span className="truncate">{meetingButtonLabel(meeting)}</span>
+            </button>
+          ) : null}
+        </div>
       )}
     </section>
   );
 }
 
 /** Pinned to the top: what you invest, what the home gains, and what you keep, live as settings change. */
-function LiveNumbers({ summary, className, onDone }: { summary: Headline; className: string; onDone: (() => void) | null }) {
+function LiveNumbers({
+  summary,
+  className,
+  onDone,
+  meeting,
+}: {
+  summary: Headline;
+  className: string;
+  onDone: (() => void) | null;
+  meeting: MeetingRequest | null;
+}) {
   const tone = (value: number) => (value >= 0 ? "text-[#7fd6a8]" : "text-[#f0a37f]");
   return (
     <div className={`fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-ink text-white shadow-lg ${className}`} aria-live="polite">
@@ -577,6 +606,16 @@ function LiveNumbers({ summary, className, onDone }: { summary: Headline; classN
         {onDone ? (
           <button type="button" onClick={onDone} className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-white px-4 text-sm font-semibold text-ink lg:hidden">
             See report
+          </button>
+        ) : null}
+        {meeting ? (
+          <button
+            type="button"
+            onClick={() => meeting.setOpen(true)}
+            className="hidden min-h-11 shrink-0 items-center gap-2 rounded-lg bg-[#7fd6a8] px-4 text-sm font-semibold text-ink hover:bg-[#93dfb6] lg:inline-flex"
+          >
+            <VideoIcon />
+            {meetingButtonLabel(meeting)}
           </button>
         ) : null}
       </div>

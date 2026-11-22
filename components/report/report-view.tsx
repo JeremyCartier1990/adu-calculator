@@ -2,6 +2,7 @@ import { CashFlowChart } from "@/components/cash-flow-chart";
 import { Eyebrow } from "@/components/eyebrow";
 import { CalculationBreakdown } from "@/components/report/calculation-breakdown";
 import { InvestmentSummary } from "@/components/report/investment-summary";
+import { ReportMeeting } from "@/components/funnel/schedule-call";
 import { LotMap } from "@/components/report/lot-map";
 import { BRAND } from "@/lib/brand";
 import { breakdownSteps, financingFor, headline, settingsUsed } from "@/lib/breakdown";
@@ -66,7 +67,7 @@ export function ReportView({ report, showContact }: { report: ReportRecord; show
     .map((key): [string, string] => [FACT_LABELS[key], fact(key)]);
 
   return (
-    <article className="mx-auto max-w-6xl space-y-5 px-3 py-8 sm:px-4 sm:py-12">
+    <article className={`mx-auto max-w-6xl space-y-5 px-3 py-8 sm:px-4 sm:py-12 ${showContact ? "" : "pb-28 sm:pb-28"}`}>
       <header className="overflow-hidden rounded-2xl border border-line bg-surface">
         <div className="flex flex-col lg:flex-row">
           <div className="flex flex-1 flex-col justify-between gap-8 p-6 sm:p-10">
@@ -96,6 +97,8 @@ export function ReportView({ report, showContact }: { report: ReportRecord; show
           </div>
         ) : null}
       </header>
+
+      {showContact ? null : <ReportMeeting reportId={report.id} />}
 
       {showContact ? (
         <Section title="Lead">
