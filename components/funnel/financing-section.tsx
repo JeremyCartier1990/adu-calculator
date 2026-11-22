@@ -11,7 +11,7 @@ const PLANS = [
   { id: "cash", title: "Pay cash" },
 ] as const;
 
-function Field({
+export function Field({
   id,
   label,
   unit,
@@ -67,7 +67,7 @@ export function FinancingSection({ state, estimate }: { state: FinancingState; e
     <div className="border-t border-line p-4 sm:p-8 lg:p-10">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="font-display text-2xl text-ink sm:text-3xl">How will you pay for it?</h3>
-        <p className="text-sm text-ink-soft">Change any number to match your mortgage statement</p>
+        <p className="text-sm text-ink-soft">Uses the mortgage under Property</p>
       </div>
 
       <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-10">
@@ -96,21 +96,6 @@ export function FinancingSection({ state, estimate }: { state: FinancingState; e
                 hint="Paid first; the refinance and loan cover the rest"
               />
               <Field {...field("homeValue")} label="Home value today" unit="$" placeholder="1,200,000" />
-              <Field
-                {...field("mortgageBalance")}
-                label="Mortgage balance"
-                unit="$"
-                placeholder="0 if paid off"
-                hint={state.onRecord ? `From public records · ${state.onRecord.openLoans} open loan${state.onRecord.openLoans === 1 ? "" : "s"}` : "All loans on the home"}
-              />
-              <Field {...field("currentRate")} label="Current rate" unit="%" placeholder="3.5" />
-              <Field
-                {...field("currentPayment")}
-                label="Current payment"
-                unit="$/mo"
-                placeholder={financing.currentPaymentEstimated ? formatMoney(financing.currentPayment).slice(1) : ""}
-                hint="Principal and interest"
-              />
               <div>
                 <Field {...field("refiRate")} label="30-year refinance rate" unit="%" placeholder={percentLabel(FINANCING.defaultRefiRate)} />
                 {state.market ? (

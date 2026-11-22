@@ -48,17 +48,17 @@ test("rent lookups snap to 50 sqft buckets inside the slider", () => {
   assert.equal(snapSqft(5000), 1200);
 });
 
-test("every price is the builder's cost times the 1.6 markup", () => {
+test("construction, plans and permits carry the 1.6 markup; finish materials are at cost", () => {
   assert.equal(ASSUMPTIONS.cost.markup, 1.6, "Update this test in the same edit if you retune assumptions.ts");
   const estimate = calculateEstimate(input({ sqft: 700, finish: "standard" }));
-  // $250 build × 1.6 = $400 per sqft; $80 finish materials × 1.6 = $128 per sqft
+  // $250 build × 1.6 = $400 per sqft; $80 finish materials at cost
   assert.equal(estimate.construction, 700 * 400);
-  assert.equal(estimate.materials, 700 * 128);
+  assert.equal(estimate.materials, 700 * 80);
   assert.equal(estimate.cityFees, 3500 * 1.6);
   assert.equal(estimate.total, estimate.construction + estimate.materials + estimate.design + estimate.cityFees);
-  assert.equal(constructionPrices("eco").perSqft, 400);
-  assert.equal(constructionPrices("premium").perSqft, 672);
-  assert.match(estimate.notes.join(" "), /construction is \$400 per square foot and finish materials are \$128/);
+  assert.equal(constructionPrices("eco").perSqft, 200 * 1.6 + 50);
+  assert.equal(constructionPrices("premium").perSqft, 270 * 1.6 + 150);
+  assert.match(estimate.notes.join(" "), /construction is \$400 per square foot and finish materials are \$80/);
 });
 
 test("plans run $6,000 to $10,000 in cost by size, before markup", () => {

@@ -134,7 +134,7 @@ export function calculateFinancing(input: FinancingInputs, projectCost: number, 
   }
 
   const unsecuredPayment = monthlyPayment(unsecuredAmount, unsecuredRate, unsecuredYears);
-  const addedMortgagePayment = newPayment - currentPayment;
+  const addedMortgagePayment = addedPayment(newPayment, currentPayment, newLoan - mortgageBalance, refiRate);
   const cashFromOwner = Math.max(0, cost - cashOut - unsecuredAmount);
   const shortfall = cashFromOwner - cashDown;
   if (input.plan === "refinance" && shortfall > 0 && homeValue > 0) {
@@ -204,10 +204,15 @@ export function refinanceAfterBuild(financing: Financing, valueAdded: number): R
   const room = Math.max(0, dollars(maxLoan * (1 - FINANCING.closingCostRate) - financing.newLoan));
   const unsecuredPaidOff = Math.min(financing.unsecuredAmount, room);
   const unsecuredLeft = financing.unsecuredAmount - unsecuredPaidOff;
-  const newLoan = unsecuredPaidOff > 0 ? dollars((financing.newLoan + unsecuredPaidOff) / (1 - FINANCING.closingCostRate)) : financing.newLoan;
+  // Nothing to fold in: there's no second refinance.
+  if (unsecuredPaidOff <= 0) return null;
+  const newLoan = dollars((financing.newLoan + unsecuredPaidOff) / (1 - FINANCING.closingCostRate));
   const newPayment = monthlyPayment(newLoan, financing.refiRate, FINANCING.refiYears);
   const unsecuredPayment = monthlyPayment(unsecuredLeft, financing.unsecuredRate, financing.unsecuredYears);
-  const monthlyDebt = newPayment - financing.currentPayment + unsecuredPayment;
+  const monthlyDebt =
+    addedPayment(newPayment, financing.currentPayment, newLoan - financing.mortgageBalance, financing.refiRate) + unsecuredPayment;
+  // Only worth suggesting when it lowers the monthly payments.
+  if (monthlyDebt >= financing.monthlyDebt) return null;
   return {
     appraisedValue,
     maxLoan,
@@ -220,6 +225,15 @@ export function refinanceAfterBuild(financing: Financing, valueAdded: number): R
     monthlySavings: financing.monthlyDebt - monthlyDebt,
     interestSavedYearOne: dollars(unsecuredPaidOff * (financing.unsecuredRate - financing.refiRate)),
   };
+}
+
+/**
+ * What the ADU adds to the mortgage payment. A refinance can lower the payment on the loan
+ * already there (a high-rate or short-term loan replaced by a 30-year one); that saving isn't
+ * the ADU's, so the ADU always carries at least the payment on the money it borrowed.
+ */
+function addedPayment(newPayment: number, currentPayment: number, borrowed: number, rate: number): number {
+  return Math.max(newPayment - currentPayment, monthlyPayment(Math.max(0, borrowed), rate, FINANCING.refiYears));
 }
 
 function dollarsLabel(value: number): string {

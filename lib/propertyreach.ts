@@ -79,6 +79,27 @@ export function propertyReachUrl(address: string, latitude: number | null, longi
 const num = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
 const text = (value: unknown): string | null => (typeof value === "string" && value.trim() ? value.trim() : null);
 
+/** Loans this short are usually bridge or private loans: interest-only, with the balance due at the end. */
+export const SHORT_LOAN_MONTHS = 60;
+
+/**
+ * The monthly payment on record. PropertyReach amortizes every loan over its term, so a
+ * 19-month bridge loan shows the whole balance repaid in 19 payments; those loans are
+ * counted as interest-only instead.
+ */
+export function paymentOnRecord(financials: Pick<PropertyFinancials, "loans" | "monthlyPayment">): { payment: number | null; interestOnly: boolean } {
+  const short = financials.loans.filter(
+    (loan) => loan.termMonths != null && loan.termMonths <= SHORT_LOAN_MONTHS && loan.rate != null && (loan.estimatedBalance ?? loan.amount ?? 0) > 0,
+  );
+  if (short.length === 0) return { payment: financials.monthlyPayment, interestOnly: false };
+  const payment = financials.loans.reduce((sum, loan) => {
+    const balance = loan.estimatedBalance ?? loan.amount ?? 0;
+    if (short.includes(loan)) return sum + (balance * loan.rate!) / 12;
+    return sum + (loan.estimatedPayment ?? 0);
+  }, 0);
+  return { payment: Math.round(payment), interestOnly: true };
+}
+
 /** Keep only the fields the team uses from a Property Details response. */
 export function parsePropertyReach(body: unknown, fetchedAt = new Date().toISOString()): PropertyFinancials | null {
   const property = (body as { property?: unknown } | null)?.property;
@@ -100,6 +121,7 @@ export function parsePropertyReach(body: unknown, fetchedAt = new Date().toISOSt
     }));
   const estimatedValue = num(p.estimatedValue);
   const loanBalance = num(p.loanBalance) ?? (loans.length ? loans.reduce((sum, loan) => sum + (loan.estimatedBalance ?? 0), 0) : 0);
+  const { payment } = paymentOnRecord({ loans, monthlyPayment: num(p.loanPaymentAmount) });
   return {
     source: "propertyreach",
     fetchedAt,
@@ -107,7 +129,7 @@ export function parsePropertyReach(body: unknown, fetchedAt = new Date().toISOSt
     estimatedEquity: num(p.estimatedEquity),
     loanToValue: num(p.loanToValueRatio),
     loanBalance,
-    monthlyPayment: num(p.loanPaymentAmount),
+    monthlyPayment: payment,
     openLoanCount: num(p.openLoanCount) ?? loans.length,
     helocCapacity: estimatedValue == null ? null : Math.max(0, Math.round(estimatedValue * HELOC_MAX_CLTV - (loanBalance ?? 0))),
     ownerOccupied: typeof p.ownerOccupied === "boolean" ? p.ownerOccupied : null,

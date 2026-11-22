@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parsePropertyReach, parsePropertyReachFacts, propertyReachUrl, splitUsAddress } from "./propertyreach";
+import { parsePropertyReach, parsePropertyReachFacts, paymentOnRecord, propertyReachUrl, splitUsAddress } from "./propertyreach";
 
 test("splits a Google-formatted US address", () => {
   assert.deepEqual(splitUsAddress("2543 Walnut Ave, Venice, CA 90291, USA"), {
@@ -75,4 +75,23 @@ test("reads confirm-step facts and the value estimate", () => {
   assert.equal(facts?.property.squareFootage, 3316);
   assert.equal(facts?.value.price, 3_121_000);
   assert.equal(parsePropertyReachFacts({ meta: { resultCount: 0 } }), null);
+});
+
+test("a short bridge loan counts as interest-only, not repaid over its term", () => {
+  const loan = (termMonths: number, extra = {}) => ({
+    lender: null,
+    loanType: null,
+    rateType: null,
+    rate: 0.0666,
+    amount: 1_540_000,
+    estimatedBalance: 1_462_922,
+    estimatedPayment: 85_626,
+    termMonths,
+    recordingDate: null,
+    ...extra,
+  });
+  const bridge = paymentOnRecord({ loans: [loan(19)], monthlyPayment: 85_626 });
+  assert.deepEqual(bridge, { payment: Math.round((1_462_922 * 0.0666) / 12), interestOnly: true });
+  const mortgage = paymentOnRecord({ loans: [loan(360, { estimatedPayment: 9_200 })], monthlyPayment: 9_200 });
+  assert.deepEqual(mortgage, { payment: 9_200, interestOnly: false });
 });

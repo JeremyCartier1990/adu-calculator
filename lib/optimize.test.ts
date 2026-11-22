@@ -24,7 +24,7 @@ test("the suggested size follows the lot and stays between 500 and 800 sqft", ()
 
 test("the best setup opens at the suggested size on the better ADU type", () => {
   const best = bestSetup(HOME);
-  assert.equal(best.finish, "standard");
+  assert.equal(best.finish, "eco");
   assert.equal(best.sqft, 700);
   const other = best.projectType === "detached_adu" ? "attached_adu" : "detached_adu";
   assert.ok(setupGain(best, HOME) >= setupGain({ ...best, projectType: other }, HOME));
@@ -36,6 +36,6 @@ test("the best setup opens at the suggested size on the better ADU type", () => 
 
 test("a new report opens on the ADU type the homeowner picked", () => {
   assert.deepEqual(openingSetup(HOME, null), bestSetup(HOME));
-  assert.deepEqual(openingSetup(HOME, "detached_adu"), { projectType: "detached_adu", finish: "standard", sqft: 700 });
-  assert.deepEqual(openingSetup(HOME, "garage_conversion"), { projectType: "garage_conversion", finish: "standard", sqft: 400 });
+  assert.deepEqual(openingSetup(HOME, "detached_adu"), { projectType: "detached_adu", finish: "eco", sqft: 700 });
+  assert.deepEqual(openingSetup(HOME, "garage_conversion"), { projectType: "garage_conversion", finish: "eco", sqft: 400 });
 });

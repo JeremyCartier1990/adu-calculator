@@ -114,7 +114,8 @@ const marked = (cost: number) => cost * ASSUMPTIONS.cost.markup;
 /** What the homeowner pays per square foot for construction and finish materials. */
 export function constructionPrices(finish: FinishLevelId) {
   const build = marked(ASSUMPTIONS.cost.buildPerSqft[finish]);
-  const finishes = marked(ASSUMPTIONS.cost.finishPerSqft[finish]);
+  // Finish materials pass through at cost, with no markup.
+  const finishes = ASSUMPTIONS.cost.finishPerSqft[finish];
   return { build, finishes, perSqft: build + finishes };
 }
 

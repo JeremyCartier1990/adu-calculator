@@ -58,10 +58,14 @@ export const FINISH_LEVELS = [
   text: string;
 }>;
 
+/** Every new report opens on the eco finish, the lowest price; the homeowner can step up from there. */
+export const OPENING_FINISH: FinishLevelId = "eco";
+
 export const ASSUMPTIONS = {
   /**
-   * The builder's costs, before markup. Every price the homeowner sees is cost × markup,
-   * and only the marked-up prices are shown. Rates are the same for every ADU type.
+   * The builder's costs, before markup. Construction, plans and permits are cost × markup;
+   * finish materials are charged at cost. Only the final prices are shown. Rates are the same
+   * for every ADU type.
    */
   cost: {
     markup: 1.6,
@@ -138,7 +142,7 @@ export const ASSUMPTIONS = {
     occupancyMin: 0.2,
     occupancyMax: 0.95,
     /** Full-service short-term management. Long-term does not charge this. */
-    managementRate: 0.2,
+    managementRate: 0.15,
   },
   size: {
     min: 300,

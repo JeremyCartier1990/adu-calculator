@@ -1,4 +1,4 @@
-import { ASSUMPTIONS, normalizeFinish, PROJECT_TYPES, type ProjectTypeId } from "./assumptions";
+import { ASSUMPTIONS, normalizeFinish, OPENING_FINISH, PROJECT_TYPES, type ProjectTypeId } from "./assumptions";
 import { calculateEstimate, type Estimate, type EstimateInput, type RentSource, type RentalUse } from "./calculate";
 import { validateAddress } from "./address";
 import { cleanText } from "./lead";
@@ -147,7 +147,7 @@ export function parseReportInputs(input: unknown): ReportInputs | null {
  * value estimate uses the long-term lease, the way an appraiser would.
  */
 export function estimateReport(inputs: ReportInputs): Estimate {
-  return calculateEstimate({ ...inputs, finish: normalizeFinish(inputs.finish) ?? "standard", rentalUse: "long_term" });
+  return calculateEstimate({ ...inputs, finish: normalizeFinish(inputs.finish) ?? OPENING_FINISH, rentalUse: "long_term" });
 }
 
 /** Annual net income over all-in project cost. */

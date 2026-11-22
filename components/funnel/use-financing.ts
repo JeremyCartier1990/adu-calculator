@@ -36,7 +36,19 @@ type Prefill = { homeValue: number | null; mortgageBalance: number | null; curre
  * Financing state for the builder. Today's 30-year rate loads from Freddie Mac;
  * in the team builder the mortgage on record fills in too. Anything typed stays typed.
  */
-export function useFinancing(homeValue: number | null, saved: FinancingInputs | null | undefined, teamReportId: string | null) {
+/** Loans on record above the home's value: the value is raised to the balance, and the builder says so. */
+export type ValueRaised = { listed: number; balance: number };
+
+export function useFinancing(
+  homeValue: number | null,
+  saved: FinancingInputs | null | undefined,
+  teamReportId: string | null,
+  onValueRaised?: (raised: ValueRaised) => void,
+) {
+  const onValueRaisedRef = useRef(onValueRaised);
+  useEffect(() => {
+    onValueRaisedRef.current = onValueRaised;
+  });
   const [plan, setPlan] = useState<FinancingPlan>(saved?.plan ?? "refinance");
   const [draft, setDraft] = useState<FinancingDraft>({
     homeValue: money(saved ? saved.homeValue : homeValue),
@@ -50,7 +62,7 @@ export function useFinancing(homeValue: number | null, saved: FinancingInputs | 
     cashDown: money(saved?.cashDown),
   });
   const [market, setMarket] = useState<{ rate: number; asOf: string } | null>(null);
-  const [onRecord, setOnRecord] = useState<{ openLoans: number } | null>(null);
+  const [onRecord, setOnRecord] = useState<{ openLoans: number; interestOnly: boolean } | null>(null);
   const touched = useRef(new Set<FinancingField>(saved ? (Object.keys(draft) as FinancingField[]) : []));
 
   // This week's Freddie Mac average, shown next to the rate for comparison.
@@ -72,10 +84,10 @@ export function useFinancing(homeValue: number | null, saved: FinancingInputs | 
     if (!teamReportId || saved) return;
     let live = true;
     fetch(`/api/team/reports/${teamReportId}/financials`)
-      .then((response) => response.json() as Promise<{ ok: boolean; openLoans?: number } & Partial<Prefill>>)
+      .then((response) => response.json() as Promise<{ ok: boolean; openLoans?: number; interestOnly?: boolean } & Partial<Prefill>>)
       .then((data) => {
         if (!live || !data.ok) return;
-        setOnRecord({ openLoans: data.openLoans ?? 0 });
+        setOnRecord({ openLoans: data.openLoans ?? 0, interestOnly: Boolean(data.interestOnly) });
         setDraft((current) => {
           const next = { ...current };
           const fill = (field: FinancingField, value: string) => {
@@ -87,6 +99,13 @@ export function useFinancing(homeValue: number | null, saved: FinancingInputs | 
           fill("currentPayment", money(data.currentPayment));
           return next;
         });
+        // No lender lends more than a home is worth, so a value below the loans is likely out of date:
+        // start from the balance instead.
+        const listed = homeValue ?? data.homeValue ?? null;
+        if (data.mortgageBalance != null && listed != null && listed > 0 && data.mortgageBalance > listed && !touched.current.has("homeValue")) {
+          setDraft((current) => ({ ...current, homeValue: money(data.mortgageBalance) }));
+          onValueRaisedRef.current?.({ listed, balance: data.mortgageBalance });
+        }
       })
       .catch(() => {});
     return () => {

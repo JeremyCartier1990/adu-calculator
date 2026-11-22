@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowBox, Eyebrow } from "@/components/eyebrow";
-import { FinancingSection } from "@/components/funnel/financing-section";
+import { Field, FinancingSection } from "@/components/funnel/financing-section";
 import { ScheduleCall } from "@/components/funnel/schedule-call";
 import { FACT_FIELDS } from "@/components/funnel/shared";
 import { useAnalysis } from "@/components/funnel/use-analysis";
@@ -10,7 +10,7 @@ import { CalculationBreakdown } from "@/components/report/calculation-breakdown"
 import { InvestmentSummary, projectPhrase } from "@/components/report/investment-summary";
 import { LotMapDialog } from "@/components/report/lot-map-dialog";
 import { ResultsPanel } from "@/components/results-panel";
-import { ASSUMPTIONS, bedroomLabel, FINISH_LEVELS, PROJECT_TYPES, projectTitle } from "@/lib/assumptions";
+import { ASSUMPTIONS, bedroomLabel, finishTitle, FINISH_LEVELS, PROJECT_TYPES, projectTitle } from "@/lib/assumptions";
 import { BRAND } from "@/lib/brand";
 import { BEST_SETUP_YEARS } from "@/lib/optimize";
 import { breakdownSteps, financingFor, headline, settingsUsed, type Headline } from "@/lib/breakdown";
@@ -200,7 +200,7 @@ export function AnalysisSection({
             <p className="leading-6">
               {analysis.onBest
                 ? `This is the best setup for this property: a ${projectPhrase(estimate)}, a size that fits this lot, on the ADU type with the higher ${BEST_SETUP_YEARS}-year return. You can change anything.`
-                : `The best setup for this property is a ${analysis.best.sqft.toLocaleString("en-US")} sqft ${projectTitle(analysis.best.projectType).toLowerCase().replace("adu", "ADU")} with a standard finish.`}
+                : `The best setup for this property is a ${analysis.best.sqft.toLocaleString("en-US")} sqft ${projectTitle(analysis.best.projectType).toLowerCase().replace("adu", "ADU")} with the ${finishTitle(analysis.best.finish).toLowerCase()} finish.`}
             </p>
             {analysis.onBest ? null : (
               <button
@@ -463,9 +463,17 @@ export function AnalysisSection({
                       />
                       {field.suffix ? <span className="whitespace-nowrap pr-3 text-sm text-ink-soft">{field.suffix}</span> : null}
                     </div>
+                    {field.key === "homeValue" && analysis.valueRaised ? (
+                      <p className="mt-1 text-xs leading-5 text-ink-soft">
+                        Public records list this home at {formatMoney(analysis.valueRaised.listed)}, less than the{" "}
+                        {formatMoney(analysis.valueRaised.balance)} in loans on it. A lender wouldn&apos;t lend more than a home is worth, so the listed
+                        value is likely out of date and we raised it to the loan balance. If you believe it&apos;s worth more, change it.
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>
+              <MortgageFields analysis={analysis} financing={financing} />
             </fieldset>
           </div>
         </div>
@@ -596,3 +604,58 @@ function StepLegend({ n, as = "legend", children }: { n: string; as?: "legend" |
 }
 
 function noop() {}
+
+/**
+ * The mortgage on the home, next to its value: public records can be stale or odd (a short
+ * bridge loan, a paid-off home still showing a loan), so the homeowner can correct it here.
+ */
+function MortgageFields({
+  analysis,
+  financing,
+}: {
+  analysis: ReturnType<typeof useAnalysis>;
+  financing: ReturnType<typeof financingFor>;
+}) {
+  const state = analysis.financing;
+  const field = (name: "mortgageBalance" | "currentRate" | "currentPayment") => ({
+    id: `financing-${name}`,
+    value: state.draft[name],
+    onChange: (value: string) => state.setField(name, value),
+  });
+  const value = state.inputs.homeValue ?? analysis.facts.homeValue;
+  const balance = state.inputs.mortgageBalance ?? 0;
+  const equity = value == null ? null : value - balance;
+  const onRecord = state.onRecord;
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <p className="text-sm font-semibold text-ink">Mortgage</p>
+      <p className="mt-1 text-sm leading-6 text-ink-soft">
+        {onRecord
+          ? `From public records: ${onRecord.openLoans} open loan${onRecord.openLoans === 1 ? "" : "s"}. Match it to your mortgage statement.`
+          : "All loans on the home. Leave the balance at 0 if it's paid off."}
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <Field {...field("mortgageBalance")} label="Mortgage balance" unit="$" placeholder="0 if paid off" />
+        </div>
+        <Field {...field("currentRate")} label="Current rate" unit="%" placeholder="3.5" />
+        <Field
+          {...field("currentPayment")}
+          label="Monthly payment"
+          unit="$/mo"
+          placeholder={financing.currentPaymentEstimated ? formatMoney(financing.currentPayment).slice(1) : ""}
+          hint={onRecord?.interestOnly ? "Short-term loan on record, counted as interest-only" : "Principal and interest"}
+        />
+      </div>
+      {equity != null ? (
+        <div className="mt-3 flex items-baseline justify-between gap-3 rounded-lg bg-white px-3 py-2.5 text-sm">
+          <span className="text-ink-soft">Current equity</span>
+          <span className={`font-semibold tabular-nums ${equity < 0 ? "text-clay" : "text-ink"}`}>
+            {equity < 0 ? `-${formatMoney(-equity)}` : formatMoney(equity)}
+            {value ? <span className="font-normal text-ink-soft"> · {Math.round((equity / value) * 100)}% of value</span> : null}
+          </span>
+        </div>
+      ) : null}
+    </div>
+  );
+}

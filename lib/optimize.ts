@@ -1,4 +1,4 @@
-import { ASSUMPTIONS, bedroomsForSqft, type FinishLevelId, type ProjectTypeId } from "./assumptions";
+import { ASSUMPTIONS, bedroomsForSqft, OPENING_FINISH, type FinishLevelId, type ProjectTypeId } from "./assumptions";
 import { calculateEstimate, fallbackMonthlyRent } from "./calculate";
 
 /**
@@ -13,8 +13,7 @@ export type Setup = { projectType: ProjectTypeId; finish: FinishLevelId; sqft: n
 
 /** Gains are counted over this many years: value added − cost, plus the long-term rent kept. */
 export const BEST_SETUP_YEARS = 10;
-/** Finish doesn't change rent in the model, so the cheapest would always win; standard is the honest middle. */
-const FINISH: FinishLevelId = "standard";
+const FINISH = OPENING_FINISH;
 
 /**
  * Largest ADU the state lets you build here (Gov. Code §66314 and §66321):

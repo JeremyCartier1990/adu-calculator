@@ -7,7 +7,7 @@ import { fallbackMonthlyRent, scaleNightlyRate, scaleRent, type RentSource } fro
 import { dollars, parseNumber, parsePositive } from "@/lib/money";
 import type { LatLng } from "@/lib/footprint";
 import { bestSetup, openingSetup } from "@/lib/optimize";
-import { useFinancing } from "./use-financing";
+import { useFinancing, type ValueRaised } from "./use-financing";
 import { estimateReport, parsePropertyFacts, type ConfirmedProperty, type PropertyFacts, type ReportInputs } from "@/lib/report";
 import type { FactKey, Facts } from "./shared";
 
@@ -57,7 +57,13 @@ export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | n
   const facts: PropertyFacts = parsePropertyFacts(
     Object.fromEntries(FACT_KEYS.map((key) => [key, parseNumber(factDraft[key])])),
   )!;
-  const financing = useFinancing(property.homeValue, saved?.financing, teamReportId);
+  const [valueRaised, setValueRaised] = useState<ValueRaised | null>(null);
+  const financing = useFinancing(property.homeValue, saved?.financing, teamReportId, (raised) => {
+    setFactDraft((current) =>
+      parseNumber(current.homeValue) === raised.listed || current.homeValue.trim() === "" ? { ...current, homeValue: factText("homeValue", raised.balance) } : current,
+    );
+    setValueRaised(raised);
+  });
   const occupancyTouched = useRef(saved?.strOccupancy != null);
   const inflight = useRef(false);
   // A lookup that came back empty isn't repeated for other sizes.
@@ -166,6 +172,8 @@ export function useAnalysis(property: ConfirmedProperty, saved: ReportInputs | n
     },
     facts,
     factDraft,
+    /** Set while the home value still shows the mortgage balance it was raised to. */
+    valueRaised: valueRaised && parseNumber(factDraft.homeValue) === valueRaised.balance ? valueRaised : null,
     setFact(key: FactKey, value: string) {
       // The financing uses the same home value unless a different one was typed there.
       if (key === "homeValue") financing.followHomeValue(value, factDraft.homeValue);

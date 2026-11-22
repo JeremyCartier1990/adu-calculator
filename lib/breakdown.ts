@@ -164,7 +164,10 @@ export function breakdownSteps(estimate: Estimate, financing: Financing): Breakd
             ...(financing.cashDown > 0 ? [{ label: "Cash you put in", math: "Paid first, before borrowing", value: formatMoney(financing.cashDown) }] : []),
             {
               label: "Cash-out refinance",
-              math: `New ${formatMoney(financing.newLoan)} loan at ${pct(financing.refiRate, 2)}, ${FINANCING.refiYears} years, up to ${pct(FINANCING.maxLoanToValue)} of value`,
+              math:
+                financing.cashOut > 0
+                  ? `New ${formatMoney(financing.newLoan)} loan at ${pct(financing.refiRate, 2)}, ${FINANCING.refiYears} years, up to ${pct(FINANCING.maxLoanToValue)} of value`
+                  : `No equity to take out: loans already exceed ${pct(FINANCING.maxLoanToValue)} of value`,
               value: formatMoney(financing.cashOut),
             },
             {
@@ -190,7 +193,8 @@ export function breakdownSteps(estimate: Estimate, financing: Financing): Breakd
     },
     {
       n: "5",
-      title: refinance && financing.unsecuredAmount > 0 ? "Until the refinance" : "What you keep each month",
+      // "Until the refinance" only when one is coming: there has to be room to fold the loan into the mortgage.
+      title: refinanceAfterBuild(financing, estimate.blendedUplift) ? "Until the refinance" : "What you keep each month",
       result: `${formatMoney(longTerm.monthlyNet - financing.monthlyDebt)} or ${formatMoney(shortTerm.monthlyNet - financing.monthlyDebt)}`,
       lines: [
         { label: "Long-term lease", math: `${formatMoney(longTerm.monthlyNet)} net − ${formatMoney(financing.monthlyDebt)} loans`, value: perMonth(longTerm.monthlyNet - financing.monthlyDebt), strong: true },

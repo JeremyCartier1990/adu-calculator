@@ -95,9 +95,16 @@ test("after the build, the reappraised home refinances the unsecured loan at the
 
 test("a small value gain only pays off part of the unsecured loan", () => {
   const during = calculateFinancing({ ...BASE, homeValue: 900_000 }, 300_000, 2_000);
-  const after = refinanceAfterBuild(during, 20_000)!;
+  const after = refinanceAfterBuild(during, 120_000)!;
   assert.ok(after.unsecuredPaidOff > 0 && after.unsecuredPaidOff < 100_000);
   assert.equal(after.unsecuredLeft, 100_000 - after.unsecuredPaidOff);
+  assert.ok(after.monthlyDebt < during.monthlyDebt);
+});
+
+test("a refinance that would raise the payments isn't suggested", () => {
+  // Closing costs on the whole mortgage to pay off about $1,300 of the unsecured loan.
+  const during = calculateFinancing({ ...BASE, homeValue: 900_000 }, 300_000, 2_000);
+  assert.equal(refinanceAfterBuild(during, 20_000), null);
 });
 
 test("nothing to refinance without an unsecured loan", () => {
@@ -113,4 +120,34 @@ test("cash put in first shrinks what's borrowed", () => {
   assert.equal(plan.cashFromOwner, 150_000);
   assert.ok(!plan.warnings.some((warning) => warning.includes("more to pay from savings")));
   assert.equal(calculateFinancing({ ...BASE, cashDown: 999_999 }, 300_000, 2_000).cashFromOwner, 300_000);
+});
+
+test("refinance savings on the existing loan never count as ADU income", () => {
+  // A $1.46M short-term bridge loan at $85,626 a month on a $996,000 home.
+  const inputs = {
+    plan: "refinance" as const,
+    homeValue: 996_000,
+    mortgageBalance: 1_462_922,
+    currentRate: 0.0666,
+    currentPayment: 85_626,
+    refiRate: 0.059,
+    refiRateAsOf: null,
+    unsecuredRate: 0.09,
+  };
+  const financing = calculateFinancing(inputs, 318_400, 2_995);
+  assert.equal(financing.cashOut, 0);
+  assert.ok(financing.addedMortgagePayment >= 0);
+  assert.ok(financing.monthlyDebt > 0);
+  const after = refinanceAfterBuild(financing, 419_570);
+  if (after) assert.ok(after.monthlyDebt > 0);
+});
+
+test("a cheaper refinance still charges the ADU for the money it borrowed", () => {
+  const financing = calculateFinancing(
+    { plan: "refinance", homeValue: 1_000_000, mortgageBalance: 300_000, currentRate: 0.09, currentPayment: 2_414, refiRate: 0.059, refiRateAsOf: null, unsecuredRate: 0.09 },
+    200_000,
+    2_000,
+  );
+  assert.ok(financing.cashOut > 0);
+  assert.ok(financing.addedMortgagePayment > 0);
 });

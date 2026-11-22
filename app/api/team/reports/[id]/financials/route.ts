@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { hasTeamAccess } from "@/lib/admin-auth";
-import { fetchPropertyFinancials } from "@/lib/propertyreach";
+import { fetchPropertyFinancials, paymentOnRecord } from "@/lib/propertyreach";
 import { enableSharedPropertyReachCache } from "@/lib/propertyreach-cache";
 import { getReport } from "@/lib/report-store";
 
@@ -22,12 +22,15 @@ export async function GET(_request: Request, { params }: RouteContext<"/api/team
   const rated = financials.loans.filter((loan) => loan.rate != null && (loan.estimatedBalance ?? loan.amount ?? 0) > 0);
   const weight = rated.reduce((sum, loan) => sum + (loan.estimatedBalance ?? loan.amount ?? 0), 0);
   const rate = weight > 0 ? rated.reduce((sum, loan) => sum + loan.rate! * (loan.estimatedBalance ?? loan.amount ?? 0), 0) / weight : null;
+  // Reports saved earlier kept PropertyReach's own payment; work it out again from the loans.
+  const { payment, interestOnly } = paymentOnRecord(financials);
   return Response.json({
     ok: true,
     homeValue: financials.estimatedValue,
     mortgageBalance: financials.loanBalance ?? (financials.openLoanCount === 0 ? 0 : null),
     currentRate: rate == null ? null : Math.round(rate * 10000) / 10000,
-    currentPayment: financials.monthlyPayment,
+    currentPayment: payment,
+    interestOnly,
     openLoans: financials.openLoanCount,
   });
 }
