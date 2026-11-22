@@ -164,6 +164,68 @@ export function SampleReport() {
   );
 }
 
+const OLD_WAY = [
+  "Book a consultation and wait for a free site visit",
+  "Sit through a sales pitch to hear a price",
+  "Wait days for a bid you can't take apart",
+  "Start over with the next builder to compare",
+];
+const THIS_WAY = [
+  "Enter your address and get your numbers in about a minute",
+  "Every cost, value and rent figure shown line by line",
+  "Change the ADU type, size, finish or financing yourself",
+  "Keep a PDF and a private link, and talk to us only if you want to",
+];
+
+/** The core pitch for ad traffic: the first estimate doesn't take a sales meeting. */
+export function NoSalesCall() {
+  return (
+    <section className="px-3 pt-16 sm:px-4 md:pt-24" aria-labelledby="no-sales-heading">
+      <div className="mx-auto max-w-[1400px]">
+        <div className="px-1 sm:px-2">
+          <Eyebrow>No sales call</Eyebrow>
+          <h2 id="no-sales-heading" className="mt-5 max-w-3xl font-display text-4xl leading-[1.05] sm:text-5xl">
+            Skip the sales meeting. <span className="text-ink-soft">Run the numbers yourself.</span>
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-ink-soft">
+            You don&apos;t need a salesperson, a site visit, or a spreadsheet to know if an ADU makes sense. Get a first estimate on your own,
+            online, whenever you want.
+          </p>
+        </div>
+        <div className="mt-8 grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-line bg-surface p-6 sm:p-8">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-ink-soft">The usual way</h3>
+            <ul className="mt-5 space-y-3">
+              {OLD_WAY.map((item) => (
+                <li key={item} className="flex items-start gap-3 text-base leading-6 text-ink-soft">
+                  <svg viewBox="0 0 16 16" className="mt-1 h-4 w-4 shrink-0 text-clay" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M4 4l8 8M12 4l-8 8" />
+                  </svg>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-2xl bg-ink p-6 text-white sm:p-8">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-white/60">With {BRAND.short}</h3>
+            <ul className="mt-5 space-y-3">
+              {THIS_WAY.map((item) => (
+                <li key={item} className="flex items-start gap-3 text-base leading-6 text-white/90">
+                  <Check className="mt-1 text-[#7fd6a8]" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-7">
+              <StartButton tone="light">Get my estimate online</StartButton>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 const STEPS = [
   { title: "Enter your address", text: "We look up your home's public records: size, lot, bedrooms, and estimated value." },
   { title: "Check your home's details", text: "One tap if they look right. Fix anything that's off; better inputs, better numbers." },
@@ -175,7 +237,7 @@ export function HowItWorks() {
     <section id="how" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 py-16 sm:px-6 md:py-24" aria-labelledby="how-heading">
       <Eyebrow>How it works</Eyebrow>
       <h2 id="how-heading" className="mt-5 max-w-3xl font-display text-4xl leading-[1.05] sm:text-5xl">
-        Three steps. <span className="text-ink-soft">About a minute.</span>
+        Three steps. <span className="text-ink-soft">About a minute. No meeting.</span>
       </h2>
       <ol className="mt-10 grid border-t border-line sm:grid-cols-3">
         {STEPS.map((step, index) => (
@@ -292,8 +354,12 @@ const FAQ = [
     a: "Just your address. We fill in your home's details from public records; you only check them.",
   },
   {
+    q: "Do I have to talk to a salesperson?",
+    a: "No. The report is built for you to use on your own: your numbers open right away, and you can change the ADU type, size, finish, rent and financing yourself. If you want to go over it with our team, you can book a call from the report. That part is up to you.",
+  },
+  {
     q: "Why do you ask for my phone number?",
-    a: `We text a one-time code so each report belongs to a real homeowner. ${BRAND.builder}, the builder behind the reports, may call to talk about your project; you can say no anytime.`,
+    a: `We text a one-time code so each report belongs to a real homeowner. ${BRAND.builder}, the builder behind the reports, may reach out about your project; you can say no anytime.`,
   },
   {
     q: "How accurate is it?",
@@ -341,9 +407,9 @@ export function FinalCta() {
   return (
     <section className="px-3 sm:px-4" aria-labelledby="cta-heading">
       <div className="mx-auto flex max-w-[1400px] flex-col items-center rounded-2xl bg-ink px-6 py-16 text-center text-white sm:py-24">
-        <Eyebrow tone="dark">Free · About a minute · No obligation</Eyebrow>
+        <Eyebrow tone="dark">Free · Online · No sales call</Eyebrow>
         <h2 id="cta-heading" className="mx-auto mt-6 max-w-3xl font-display text-4xl leading-[1.05] sm:text-6xl">
-          Know what an ADU is worth to you before you spend a dollar
+          Know what an ADU is worth to you before you talk to anyone
         </h2>
         <ul className="mt-6 flex flex-col gap-2 text-left text-base text-white/80 sm:flex-row sm:gap-6">
           {["Cost to build", "Value it adds", "Rent after the loan"].map((item) => (

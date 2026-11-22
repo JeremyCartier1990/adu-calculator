@@ -185,7 +185,7 @@ export function Funnel({ preview }: { preview?: React.ReactNode }) {
           </p>
         ) : (
           <ul className="mt-3 inline-flex flex-wrap justify-center gap-x-3 gap-y-1 rounded-md bg-paper/85 px-3 py-1.5 text-[13px] text-ink-soft backdrop-blur sm:gap-x-4 sm:text-sm">
-            {["100% free", "1 minute", "No obligation"].map((item) => (
+            {["100% free", "No sales call", "1 minute"].map((item) => (
               <li key={item} className="flex items-center gap-1.5">
                 <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-pine" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3.5 8.5l3 3 6-7" />

@@ -15,12 +15,12 @@ export function Hero({ children, preview }: { children: React.ReactNode; preview
           aria-hidden="true"
         />
         <div className="relative z-20 mx-auto flex w-full max-w-4xl flex-col items-center px-5 pb-48 pt-6 text-center sm:pb-0 sm:pt-16">
-          <Eyebrow>Free ADU report · California</Eyebrow>
+          <Eyebrow>Free · Online · No sales call</Eyebrow>
           <h1 id="hero-heading" className="mt-5 font-display text-[2.5rem] leading-[1.02] text-ink sm:mt-6 sm:text-6xl lg:text-7xl">
             What would an ADU <span className="text-pine">add</span> to your home?
           </h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-ink-soft sm:mt-5 sm:text-lg">
-            See the cost to build, the value it adds, and the rent you keep after loan payments. Just enter your address.
+            Your own ADU estimate, built from real data on your address: cost, value added, and the rent you keep. No salesperson, no site visit, no meeting.
           </p>
           <div className="mt-6 w-full max-w-2xl sm:mt-8">{children}</div>
         </div>
