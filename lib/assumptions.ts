@@ -59,20 +59,18 @@ export const FINISH_LEVELS = [
 }>;
 
 export const ASSUMPTIONS = {
-  /** Hard construction only. Design, permits, and utilities are separate lines. */
-  costPerSqft: {
-    garage_conversion: { eco: 225, standard: 265, premium: 345 },
-    attached_adu: { eco: 305, standard: 360, premium: 455 },
-    detached_adu: { eco: 365, standard: 430, premium: 540 },
-  },
-  design: {
-    eco: { base: 3000, perSqft: 5 },
-    standard: { base: 4000, perSqft: 7 },
-    premium: { base: 7500, perSqft: 12 },
-  },
-  permits: {
-    cityPermitBase: 5800,
-    cityPermitPerSqft: 4,
+  /**
+   * The builder's costs, before markup. Every price the homeowner sees is cost × markup,
+   * and only the marked-up prices are shown. Rates are the same for every ADU type.
+   */
+  cost: {
+    markup: 1.6,
+    buildPerSqft: { eco: 200, standard: 250, premium: 270 } as Record<FinishLevelId, number>,
+    finishPerSqft: { eco: 50, standard: 80, premium: 150 } as Record<FinishLevelId, number>,
+    /** Plans scale with size, from the smallest ADU to the largest. */
+    plans: { min: 6000, max: 10000 },
+    /** City permits run $2,000 to $5,000 by city; with no city table yet, the midpoint. */
+    permit: 3500,
   },
   operations: {
     vacancyRate: 0.05,

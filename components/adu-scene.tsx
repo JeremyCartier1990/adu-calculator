@@ -72,6 +72,32 @@ async function loadModules() {
 
 type Modules = Awaited<ReturnType<typeof loadModules>>;
 
+/** True while the visitor is typing into a field: the scene holds its frames so typing stays smooth. */
+const typing = () => {
+  const active = document.activeElement;
+  return active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+};
+
+/**
+ * Hands the main thread back between build steps, and holds the build while a field has focus,
+ * so a tap or a keystroke in the address field is never stuck behind the scene.
+ */
+async function yieldToMain(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  while (typing()) await new Promise((resolve) => document.addEventListener("focusout", () => setTimeout(resolve, 0), { once: true }));
+}
+
+/** Waits for the page to finish loading and go idle, so the form is ready to use before any 3D work starts. */
+function whenIdle(): Promise<void> {
+  return new Promise((resolve) => {
+    const idle = () =>
+      "requestIdleCallback" in window ? window.requestIdleCallback(() => resolve(), { timeout: 3000 }) : setTimeout(resolve, 1500);
+    if (document.readyState === "complete") idle();
+    else window.addEventListener("load", idle, { once: true });
+  });
+}
+
+
 export function AduScene() {
   const hostRef = useRef<HTMLDivElement>(null);
 
@@ -81,8 +107,10 @@ export function AduScene() {
     const abort = new AbortController();
     let cleanup = () => {};
 
-    // three and the assets load on the client only, after the hero text has painted.
-    loadModules()
+    // three and the assets load on the client only, once the page is idle and the form is usable.
+    whenIdle()
+      .then(yieldToMain)
+      .then(loadModules)
       .then((modules) => mountScene(modules, host, abort.signal))
       .then((dispose) => {
         if (abort.signal.aborted) dispose();
@@ -332,6 +360,7 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
   const between = (a: number, b: number) => a + random() * (b - a);
   const pick = <T,>(items: T[]) => items[Math.floor(random() * items.length)];
 
+  await yieldToMain();
   // Ground, streets, alleys, sidewalks, boardwalk, beach, sea
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), grass);
   boxUV(ground.geometry, 3);
@@ -420,6 +449,7 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
     else block(2.2, 1.2, 0.08, homeGlass, cx, 1, cz + toAlley * (d / 2 + 0.03));
   };
 
+  await yieldToMain();
   // Camera path, so nothing tall is built where the camera flies.
   const cameraClear = (x: number, z: number) => x > -16 && z > 10;
 
@@ -515,6 +545,7 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
     place(shrub.clone(), x, z, r, s);
   }
 
+  await yieldToMain();
   // The ADU, built in order: slab, studs, walls, openings, roof, lights, furniture.
   riser(W + 1, 0.04, 2.8, concrete, 0, 0, D / 2 + 1.6);
   const slab = riser(W + 0.4, SLAB, D + 0.4, concrete, 0, 0, 0);
@@ -605,6 +636,7 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
     place(planter.clone(), W / 2 + 0.5, 1.4, Math.PI / 2),
   ];
 
+  await yieldToMain();
   // Labels that follow the two buildings, so it's clear the ADU shares the lot with the existing home.
   const makeLabel = (text: string, accent: boolean) => {
     const element = document.createElement("div");
@@ -627,6 +659,7 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
   ];
   const projected = new THREE.Vector3();
 
+  await yieldToMain();
   // Post-processing: ambient occlusion grounds the objects, bloom lifts the lit windows.
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
@@ -738,8 +771,9 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
     draw();
   }
 
+  let onScreen = false;
   function start() {
-    if (running || reduceMotion) return;
+    if (running || reduceMotion || typing()) return;
     running = true;
     last = 0;
     frame = requestAnimationFrame(tick);
@@ -756,15 +790,31 @@ async function mountScene(modules: Modules, host: HTMLDivElement, signal: AbortS
   });
   resizeObserver.observe(host);
   // Only animate while the hero is on screen.
-  const visibility = new IntersectionObserver(([entry]) => (entry.isIntersecting ? start() : stop()));
+  const visibility = new IntersectionObserver(([entry]) => {
+    onScreen = entry.isIntersecting;
+    if (onScreen) start();
+    else stop();
+  });
   visibility.observe(host);
+  // Pause while a field has focus; resume once it's left.
+  const onFocusIn = () => {
+    if (typing()) stop();
+  };
+  const onFocusOut = () => setTimeout(() => onScreen && start(), 0);
+  document.addEventListener("focusin", onFocusIn);
+  document.addEventListener("focusout", onFocusOut);
   resize();
+  // Compile the shaders without blocking the page, then show the first frame.
+  await renderer.compileAsync(scene, camera);
+  await yieldToMain();
   draw();
 
   return () => {
     stop();
     resizeObserver.disconnect();
     visibility.disconnect();
+    document.removeEventListener("focusin", onFocusIn);
+    document.removeEventListener("focusout", onFocusOut);
     const materials = new Set<Material>();
     scene.traverse((object) => {
       const mesh = object as Mesh;

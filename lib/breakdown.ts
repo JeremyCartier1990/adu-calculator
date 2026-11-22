@@ -1,5 +1,5 @@
 import { ASSUMPTIONS } from "./assumptions";
-import type { Estimate } from "./calculate";
+import { constructionPrices, type Estimate } from "./calculate";
 import { calculateFinancing, FINANCING, refinanceAfterBuild, type Financing, type FinancingInputs, type RefinanceAfter } from "./financing";
 import { formatMoney, formatNumber } from "./money";
 
@@ -87,9 +87,7 @@ export function headline(estimate: Estimate, financing: Financing): Headline {
 /** Every number in the headline, worked out step by step with this report's own figures. */
 export function breakdownSteps(estimate: Estimate, financing: Financing): BreakdownStep[] {
   const { sqft, projectType, finish } = estimate;
-  const rate = ASSUMPTIONS.costPerSqft[projectType][finish];
-  const design = ASSUMPTIONS.design[finish];
-  const permits = ASSUMPTIONS.permits;
+  const prices = constructionPrices(finish);
   const factor = ASSUMPTIONS.value.sqftFactor[projectType];
   const weight = ASSUMPTIONS.value.sqftApproachWeight;
   const capRate = ASSUMPTIONS.value.capRate;
@@ -105,9 +103,10 @@ export function breakdownSteps(estimate: Estimate, financing: Financing): Breakd
       title: "What it costs",
       result: formatMoney(estimate.total),
       lines: [
-        { label: "Construction", math: `${size} × ${formatMoney(rate)} per sqft`, value: formatMoney(estimate.construction) },
-        { label: "Architectural plans", math: `${formatMoney(design.base)} + ${formatMoney(design.perSqft)} × ${size}`, value: formatMoney(estimate.design) },
-        { label: "City permits", math: `${formatMoney(permits.cityPermitBase)} + ${formatMoney(permits.cityPermitPerSqft)} × ${size}`, value: formatMoney(estimate.cityFees) },
+        { label: "Construction", math: `${size} × ${formatMoney(prices.build)} per sqft`, value: formatMoney(estimate.construction) },
+        { label: "Finish materials", math: `${size} × ${formatMoney(prices.finishes)} per sqft`, value: formatMoney(estimate.materials) },
+        { label: "Architectural plans", math: `Sized for ${size}`, value: formatMoney(estimate.design) },
+        { label: "City permits", math: "Typical fee; varies by city", value: formatMoney(estimate.cityFees) },
         { label: "Total investment", value: formatMoney(estimate.total), strong: true },
       ],
       note: `${estimate.finishLabel} finish rate for ${/^[aeiou]/i.test(estimate.projectLabel) ? "an" : "a"} ${estimate.projectLabel.replace(/^\w/, (letter) => letter.toLowerCase())}. School fees and utility connections aren't included.`,

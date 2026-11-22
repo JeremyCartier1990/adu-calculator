@@ -4,6 +4,8 @@ import { ASSUMPTIONS, bedroomsForSqft, normalizeFinish, snapSqft } from "./assum
 import {
   calculateEstimate,
   clampOccupancy,
+  constructionPrices,
+  plansPrice,
   deriveNightlyRate,
   fallbackMonthlyRent,
   scaleNightlyRate,
@@ -46,26 +48,30 @@ test("rent lookups snap to 50 sqft buckets inside the slider", () => {
   assert.equal(snapSqft(5000), 1200);
 });
 
-test("garage conversion cost sheet matches the published rates", () => {
-  const estimate = calculateEstimate(input());
-  const construction = Math.round(400 * 265);
-  const design = Math.round(4000 + 7 * 400);
-  const city = Math.round(5800 + 4 * 400);
-  assert.equal(estimate.construction, construction);
-  assert.equal(estimate.design, design);
-  assert.equal(estimate.cityFees, city);
-  assert.equal(estimate.total, construction + design + city);
-  assert.equal(
-    ASSUMPTIONS.costPerSqft.garage_conversion.standard,
-    265,
-    "Update this test in the same edit if you retune assumptions.ts",
-  );
-  assert.match(estimate.notes.join(" "), /\$265 per square foot/);
+test("every price is the builder's cost times the 1.6 markup", () => {
+  assert.equal(ASSUMPTIONS.cost.markup, 1.6, "Update this test in the same edit if you retune assumptions.ts");
+  const estimate = calculateEstimate(input({ sqft: 700, finish: "standard" }));
+  // $250 build × 1.6 = $400 per sqft; $80 finish materials × 1.6 = $128 per sqft
+  assert.equal(estimate.construction, 700 * 400);
+  assert.equal(estimate.materials, 700 * 128);
+  assert.equal(estimate.cityFees, 3500 * 1.6);
+  assert.equal(estimate.total, estimate.construction + estimate.materials + estimate.design + estimate.cityFees);
+  assert.equal(constructionPrices("eco").perSqft, 400);
+  assert.equal(constructionPrices("premium").perSqft, 672);
+  assert.match(estimate.notes.join(" "), /construction is \$400 per square foot and finish materials are \$128/);
 });
 
-test("the only fee line is city permits, at any size", () => {
-  const large = calculateEstimate(input({ sqft: 1000, projectType: "attached_adu" }));
-  assert.equal(large.total, large.construction + large.design + large.cityFees);
+test("plans run $6,000 to $10,000 in cost by size, before markup", () => {
+  assert.equal(plansPrice(300), 6000 * 1.6);
+  assert.equal(plansPrice(1200), 10000 * 1.6);
+  assert.equal(plansPrice(750), 8000 * 1.6);
+  assert.equal(plansPrice(5000), 10000 * 1.6);
+});
+
+test("construction cost is the same for every ADU type", () => {
+  const garage = calculateEstimate(input({ projectType: "garage_conversion" }));
+  const detached = calculateEstimate(input({ projectType: "detached_adu" }));
+  assert.equal(garage.total, detached.total);
 });
 
 test("detached ADU on a small lot warns, and a large garage does too", () => {
@@ -170,7 +176,7 @@ test("the long-term lease only deducts vacancy and added property tax", () => {
   );
 });
 
-test("eco finish costs less than standard for every ADU type", () => {
+test("eco finish costs less than standard", () => {
   for (const projectType of ["garage_conversion", "attached_adu", "detached_adu"] as const) {
     const eco = calculateEstimate(input({ projectType, finish: "eco", sqft: 600 }));
     const standard = calculateEstimate(input({ projectType, finish: "standard", sqft: 600 }));

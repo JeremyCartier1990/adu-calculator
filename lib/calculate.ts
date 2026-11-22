@@ -78,6 +78,8 @@ export type Estimate = {
   bedrooms: number;
   bedroomLabel: string;
   construction: number;
+  /** Finish materials, priced separately from construction. */
+  materials: number;
   design: number;
   cityFees: number;
   total: number;
@@ -106,6 +108,27 @@ export type Estimate = {
     shortTerm: RentalScenario;
   };
 };
+
+const marked = (cost: number) => cost * ASSUMPTIONS.cost.markup;
+
+/** What the homeowner pays per square foot for construction and finish materials. */
+export function constructionPrices(finish: FinishLevelId) {
+  const build = marked(ASSUMPTIONS.cost.buildPerSqft[finish]);
+  const finishes = marked(ASSUMPTIONS.cost.finishPerSqft[finish]);
+  return { build, finishes, perSqft: build + finishes };
+}
+
+/** Architectural plans, priced along the size range. */
+export function plansPrice(sqft: number): number {
+  const { min, max } = ASSUMPTIONS.size;
+  const { plans } = ASSUMPTIONS.cost;
+  const share = (Math.min(max, Math.max(min, sqft)) - min) / (max - min);
+  return dollars(marked(plans.min + (plans.max - plans.min) * share));
+}
+
+export function permitPrice(): number {
+  return dollars(marked(ASSUMPTIONS.cost.permit));
+}
 
 function clampSqft(sqft: number): number {
   if (!Number.isFinite(sqft)) return ASSUMPTIONS.size.defaults.detached_adu;
@@ -270,14 +293,12 @@ export function calculateEstimate(input: EstimateInput): Estimate {
   const monthlyRent =
     Number.isFinite(input.monthlyRent) && input.monthlyRent > 0 ? dollars(input.monthlyRent) : 0;
 
-  const constructionRate = ASSUMPTIONS.costPerSqft[projectType][finish];
-  const designRate = ASSUMPTIONS.design[finish];
-  const construction = dollars(sqft * constructionRate);
-  const design = dollars(designRate.base + designRate.perSqft * sqft);
-  const cityFees = dollars(
-    ASSUMPTIONS.permits.cityPermitBase + ASSUMPTIONS.permits.cityPermitPerSqft * sqft,
-  );
-  const total = construction + design + cityFees;
+  const prices = constructionPrices(finish);
+  const construction = dollars(sqft * prices.build);
+  const materials = dollars(sqft * prices.finishes);
+  const design = plansPrice(sqft);
+  const cityFees = permitPrice();
+  const total = construction + materials + design + cityFees;
 
   const rentalUse = input.rentalUse ?? "long_term";
   const occupancy = clampOccupancy(input.strOccupancy ?? ASSUMPTIONS.shortTerm.defaultOccupancy);
@@ -358,9 +379,9 @@ export function calculateEstimate(input: EstimateInput): Estimate {
 
   const ops = ASSUMPTIONS.operations;
   const notes = [
-    `Construction uses ${formatMoney(constructionRate)} per square foot for a ${finishTitle(finish).toLowerCase()} ${projectTitle(projectType).toLowerCase()} (hard cost only).`,
-    `Architectural plans are ${formatMoney(designRate.base)} plus ${formatMoney(designRate.perSqft)} per square foot.`,
-    `City permits are ${formatMoney(ASSUMPTIONS.permits.cityPermitBase)} plus ${formatMoney(ASSUMPTIONS.permits.cityPermitPerSqft)} per square foot.`,
+    `At the ${finishTitle(finish).toLowerCase()} finish, construction is ${formatMoney(prices.build)} per square foot and finish materials are ${formatMoney(prices.finishes)} per square foot.`,
+    `Architectural plans are ${formatMoney(plansPrice(ASSUMPTIONS.size.min))} to ${formatMoney(plansPrice(ASSUMPTIONS.size.max))}, depending on size.`,
+    `City permits are about ${formatMoney(permitPrice())}; the exact fee depends on the city.`,
     `Long-term rent is a 12-month lease. Maintenance, utilities and insurance aren't included. Vacancy is ${percentLabel(ops.vacancyRate)} of gross rent.`,
     `Short-term gross is nightly rate × ${ASSUMPTIONS.shortTerm.daysPerMonth} × occupancy. The default nightly rate is ${ASSUMPTIONS.shortTerm.nightlyFromMonthlyMultiplier}× the long-term monthly rent divided by ${ASSUMPTIONS.shortTerm.daysPerMonth} days. Default occupancy is ${percentLabel(ASSUMPTIONS.shortTerm.defaultOccupancy)}. Revenue is after the platform's fee. Management is ${percentLabel(ASSUMPTIONS.shortTerm.managementRate)}. Cleaning, supplies, repairs, utilities and insurance aren't included: guests usually pay a cleaning fee, and the rest varies by owner. This is a planning estimate, not RentCast data.`,
     `Added property tax is ${(ops.propertyTaxRate * 100).toFixed(1)}% of total project cost in year one, then grows at ${Math.round(ops.propertyTaxGrowthRate * 100)}% a year. Rent grows at ${Math.round(ops.rentGrowthRate * 100)}%.`,
@@ -408,6 +429,7 @@ export function calculateEstimate(input: EstimateInput): Estimate {
     bedrooms,
     bedroomLabel: bedroomLabel(bedrooms),
     construction,
+    materials,
     design,
     cityFees,
     total,

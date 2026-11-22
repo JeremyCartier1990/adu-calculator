@@ -5,9 +5,10 @@
  *
  * GOOGLE_MAPS_BROWSER_KEY is that referrer-restricted key, with the Maps JavaScript
  * API allowed. GOOGLE_MAPS_API_KEY stays the server key for address suggestions,
- * which Google refuses to serve with a referrer-restricted key.
+ * which Google refuses to serve with a referrer-restricted key. It must never reach the browser.
  */
 export async function GET(): Promise<Response> {
-  const key = process.env.GOOGLE_MAPS_BROWSER_KEY?.trim() || process.env.GOOGLE_MAPS_API_KEY?.trim() || null;
+  // Never fall back to the server key: whatever this returns is public.
+  const key = process.env.GOOGLE_MAPS_BROWSER_KEY?.trim() || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || null;
   return Response.json({ key }, { headers: { "Cache-Control": "no-cache" } });
 }
