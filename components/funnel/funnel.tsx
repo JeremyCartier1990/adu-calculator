@@ -5,7 +5,7 @@ import { AnalysisSection } from "@/components/funnel/analysis";
 import { AddressInput } from "@/components/funnel/address-input";
 import { ArrowBox } from "@/components/eyebrow";
 import { Hero } from "@/components/hero";
-import { captureAttribution, readAttribution } from "@/lib/attribution";
+import { captureAttribution, readAttributionForLead } from "@/lib/attribution";
 import { trackLeadConversion } from "@/lib/redtrack";
 import { rememberEditKey } from "@/lib/report-keys";
 import { validateAddress } from "@/lib/address";
@@ -538,7 +538,7 @@ function ContactStep({
         phone,
         property,
         companyWebsite: website,
-        attribution: readAttribution(),
+        attribution: await readAttributionForLead(),
       });
       if (data.ok && data.id && data.editKey) {
         onDone({ id: data.id, editKey: data.editKey }, null);

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { bookableDays, dayLabel, MEETING_TYPES, meetingType, startTimes, timeLabel, type MeetingType } from "@/lib/appointment";
-import { readAttribution } from "@/lib/attribution";
+import { readAttributionForLead } from "@/lib/attribution";
 import { BRAND } from "@/lib/brand";
 
 type Requested = { type: MeetingType; date: string; time: string };
@@ -196,7 +196,7 @@ function MeetingForm({ meeting, report }: { meeting: MeetingRequest; report: Rep
       const response = await fetch(`/api/reports/${report.id}/appointment`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(report.editKey ? { "x-edit-key": report.editKey } : {}) },
-        body: JSON.stringify({ type, date, time, note, attribution: readAttribution() }),
+        body: JSON.stringify({ type, date, time, note, attribution: await readAttributionForLead() }),
       });
       const data = (await response.json()) as { ok: boolean; message?: string };
       if (!data.ok) {

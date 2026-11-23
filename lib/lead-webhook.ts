@@ -71,7 +71,17 @@ export function leadPayload(report: ReportRecord, attribution: Attribution | nul
     adu_interest: property.interest ? projectTitle(property.interest) : "Not sure yet",
     estimate: openingEstimate(report),
     utm,
+    // SARA "New Lead - ADU" reads redtrack_click_id. cmpid and sub1–sub8 are sent beside it.
     redtrack_click_id: attribution?.rtkcid ?? null,
+    cmpid: attribution?.cmpid ?? null,
+    sub1: attribution?.sub1 ?? null,
+    sub2: attribution?.sub2 ?? null,
+    sub3: attribution?.sub3 ?? null,
+    sub4: attribution?.sub4 ?? null,
+    sub5: attribution?.sub5 ?? null,
+    sub6: attribution?.sub6 ?? null,
+    sub7: attribution?.sub7 ?? null,
+    sub8: attribution?.sub8 ?? null,
     landing_page: attribution?.landingPage ?? null,
     referrer: attribution?.referrer ?? null,
   };
