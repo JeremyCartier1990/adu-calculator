@@ -43,6 +43,9 @@ test("attribution keeps only known keys, trimmed and bounded", () => {
 test("the lead payload carries the lead, property, UTMs, and report link", () => {
   const payload = leadPayload(report, { utm_source: "facebook", utm_campaign: "adu-la", fbclid: "fb.1", rtkcid: "rt-9" });
   assert.equal(payload.redtrack_click_id, "rt-9");
+  assert.equal(payload.cmpid, null);
+  assert.equal(payload.sub1, null);
+  assert.equal(payload.sub8, null);
   assert.equal(payload.report_url, "https://aduroicalculator.com/r/abc123");
   assert.equal(payload.lead.first_name, "Maria");
   assert.equal(payload.lead.last_name, "de la Cruz");
@@ -55,6 +58,34 @@ test("the lead payload carries the lead, property, UTMs, and report link", () =>
   assert.equal(payload.utm.utm_medium, null);
   assert.equal(payload.utm.fbclid, "fb.1");
   assert.ok(payload.estimate.build_cost > 0 && payload.estimate.value_added > 0);
+});
+
+test("a click id alias becomes redtrack_click_id, and cmpid and sub1-sub8 are top-level", () => {
+  const parsed = parseAttribution({
+    clickid: " from-alias ",
+    cmpid: "CMP",
+    sub1: "one",
+    sub8: "eight",
+    evil: "no",
+  });
+  assert.equal(parsed?.rtkcid, "from-alias");
+  assert.equal(parsed?.clickid, "from-alias");
+  assert.equal(parsed && "evil" in parsed, false);
+  const payload = leadPayload(report, parsed);
+  assert.equal(payload.redtrack_click_id, "from-alias");
+  assert.equal(payload.cmpid, "CMP");
+  assert.equal(payload.sub1, "one");
+  assert.equal(payload.sub8, "eight");
+  assert.equal(payload.sub4, null);
+  assert.equal(payload.utm.rtkcid, "from-alias");
+  assert.equal(payload.utm.cmpid, "CMP");
+  assert.equal(payload.utm.sub1, "one");
+  assert.equal(payload.utm.clickid, "from-alias");
+
+  const explicit = leadPayload(report, { rtkcid: "kept", clickid: "other", sub3: "three" });
+  assert.equal(explicit.redtrack_click_id, "kept");
+  assert.equal(explicit.sub3, "three");
+  assert.equal(explicit.utm.sub3, "three");
 });
 
 test("the webhook posts JSON once on success and retries once on failure", async () => {

@@ -6,16 +6,51 @@ export const REDTRACK_SCRIPT = `${REDTRACK_DOMAIN}/uniclick.js?attribution=lastp
 
 // Must match a conversion type configured in RedTrack.
 const LEAD_TYPE = "Lead";
-const STORE_KEY = "rtkclickid-store";
+/** Cookie and localStorage key the universal script uses. Its own write sets `domain=` (empty), which browsers drop. */
+export const CLICK_STORE_KEY = "rtkclickid-store";
 
-/** The paid click id: from the URL, or where the RedTrack script stored it. */
+/**
+ * Query params that carry an already-known click, first match wins.
+ * The universal script only honors `rtkcid`; ad links also use the other three.
+ */
+export const CLICK_ID_PARAMS = ["rtkcid", "clickid", "rtkclickid", "rt_clickid"] as const;
+
+function cleanClickId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "undefined" || trimmed === "null") return null;
+  return trimmed;
+}
+
+/** The paid click id: from the URL (any accepted alias), then the script cookie, then localStorage. */
 export function readClickId(): string | null {
-  const fromUrl = new URLSearchParams(window.location.search).get("rtkcid");
-  if (fromUrl) return fromUrl;
-  const cookie = document.cookie.split("; ").find((part) => part.startsWith(`${STORE_KEY}=`));
-  if (cookie) return decodeURIComponent(cookie.slice(STORE_KEY.length + 1));
   try {
-    return window.localStorage.getItem(STORE_KEY);
+    const params = new URLSearchParams(window.location.search);
+    for (const key of CLICK_ID_PARAMS) {
+      const fromUrl = cleanClickId(params.get(key));
+      if (fromUrl) return fromUrl;
+    }
+  } catch {
+    // location unavailable
+  }
+  try {
+    const cookie = document.cookie.split("; ").find((part) => part.startsWith(`${CLICK_STORE_KEY}=`));
+    if (cookie) {
+      const raw = cookie.slice(CLICK_STORE_KEY.length + 1);
+      let decoded = raw;
+      try {
+        decoded = decodeURIComponent(raw);
+      } catch {
+        // keep the raw value
+      }
+      const fromCookie = cleanClickId(decoded);
+      if (fromCookie) return fromCookie;
+    }
+  } catch {
+    // cookies blocked
+  }
+  try {
+    return cleanClickId(window.localStorage.getItem(CLICK_STORE_KEY));
   } catch {
     return null;
   }
